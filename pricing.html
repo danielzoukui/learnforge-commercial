@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LearnForge Plans & Pricing</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --primary: #0f172a;
+      --primary-hover: #1e293b;
+      --accent: #2563eb;
+      --accent-soft: #eff6ff;
+      --accent-border: #bfdbfe;
+      --success: #16a34a;
+      --success-soft: #f0fdf4;
+      --success-border: #bbf7d0;
+      --warning: #d97706;
+      --warning-soft: #fffbeb;
+      --warning-border: #fef3c7;
+      --radius: 16px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.05);
+      --shadow-lg: 0 10px 25px rgba(0,0,0,0.07);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .nav {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--text);
+    }
+    .nav-brand span.tag {
+      font-size: 0.75rem;
+      background: #e2e8f0;
+      color: #334155;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+    .nav-account { font-size: 0.9rem; color: var(--muted); display: flex; align-items: center; gap: 12px; }
+    .nav-account strong { color: var(--text); }
+    .btn-link { background: none; border: 0; color: var(--accent); cursor: pointer; font: inherit; padding: 0; text-decoration: underline; }
+    main { max-width: 1080px; margin: 0 auto; padding: 48px 20px 80px; }
+    .hero { text-align: center; max-width: 720px; margin: 0 auto 40px; }
+    .kicker {
+      text-transform: uppercase;
+      font-size: 0.8rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    .hero h1 { font-size: 2.4rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 12px; }
+    .hero p { font-size: 1.1rem; color: var(--muted); }
+    .banner {
+      border-radius: 14px;
+      padding: 16px 20px;
+      margin-bottom: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .banner.success { background: var(--success-soft); border: 1px solid var(--success-border); color: #166534; }
+    .banner.info { background: var(--accent-soft); border: 1px solid var(--accent-border); color: #1e40af; }
+    .banner.warning { background: var(--warning-soft); border: 1px solid var(--warning-border); color: #92400e; }
+    .plans-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 24px;
+      margin-bottom: 56px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px 28px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+    .card.featured {
+      border: 2px solid var(--accent);
+      box-shadow: var(--shadow-lg);
+    }
+    .badge {
+      position: absolute;
+      top: -12px;
+      left: 28px;
+      background: var(--accent);
+      color: white;
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      padding: 3px 10px;
+      border-radius: 999px;
+      text-transform: uppercase;
+    }
+    .badge.active-badge {
+      background: var(--success);
+    }
+    .card-header { margin-bottom: 20px; }
+    .card-title { font-size: 1.4rem; font-weight: 800; margin-bottom: 4px; }
+    .card-desc { font-size: 0.92rem; color: var(--muted); min-height: 42px; }
+    .price-wrap {
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .price-num { font-size: 2.8rem; font-weight: 800; letter-spacing: -0.03em; color: var(--text); }
+    .price-period { color: var(--muted); font-size: 0.95rem; font-weight: 500; }
+    .features-list { list-style: none; margin-bottom: 28px; flex-grow: 1; }
+    .features-list li {
+      position: relative;
+      padding-left: 24px;
+      margin-bottom: 12px;
+      font-size: 0.93rem;
+      color: #334155;
+    }
+    .features-list li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      top: 0;
+      color: var(--success);
+      font-weight: 900;
+    }
+    .features-list li.muted-feat {
+      color: var(--muted);
+    }
+    .features-list li.muted-feat::before {
+      content: "—";
+      color: var(--muted);
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 13px 20px;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 700;
+      border: 0;
+      cursor: pointer;
+      transition: background 0.15s ease, opacity 0.15s ease;
+      text-align: center;
+      text-decoration: none;
+    }
+    .btn.primary { background: var(--primary); color: #fff; }
+    .btn.primary:hover { background: var(--primary-hover); text-decoration: none; }
+    .btn.accent { background: var(--accent); color: #fff; }
+    .btn.accent:hover { background: #1d4ed8; text-decoration: none; }
+    .btn.outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn.outline:hover { background: #f1f5f9; text-decoration: none; }
+    .btn.disabled { opacity: 0.6; cursor: not-allowed; background: #e2e8f0; color: #64748b; }
+    .btn.portal-btn { background: #1e293b; color: white; width: auto; padding: 8px 16px; font-size: 0.88rem; }
+    .section-title { font-size: 1.6rem; font-weight: 800; margin-bottom: 24px; text-align: center; }
+    .comparison-section { margin-bottom: 64px; }
+    .table-wrap { overflow-x: auto; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.92rem; }
+    th, td { padding: 14px 18px; border-bottom: 1px solid var(--border); }
+    th { background: #f8fafc; font-weight: 700; color: var(--text); }
+    tr:last-child td { border-bottom: 0; }
+    .check { color: var(--success); font-weight: 700; font-size: 1.1rem; }
+    .faq-section { max-width: 800px; margin: 0 auto 64px; }
+    .faq-item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 22px;
+      margin-bottom: 12px;
+    }
+    .faq-q { font-weight: 700; font-size: 1.05rem; margin-bottom: 6px; }
+    .faq-a { color: #475569; font-size: 0.94rem; }
+    footer { text-align: center; color: var(--muted); font-size: 0.88rem; border-top: 1px solid var(--border); padding-top: 32px; }
+    footer a { color: var(--muted); }
+    footer a:hover { color: var(--text); }
+    #msg { min-height: 24px; text-align: center; margin-top: 16px; font-size: 0.95rem; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-brand">
+      <a href="/" style="color:inherit; text-decoration:none;">LearnForge</a>
+      <span class="tag">Commercial 17.0</span>
+    </div>
+    <div id="accountBar" class="nav-account">Checking account status…</div>
+  </nav>
+
+  <main>
+    <div id="statusBanner"></div>
+
+    <header class="hero">
+      <div class="kicker">TRANSPARENT SUBSCRIPTION PRICING</div>
+      <h1>Choose the right LearnForge plan</h1>
+      <p>Master 23,400+ curriculum skills across math, reading, science, and world strategy. Simple monthly pricing. Cancel anytime in one click.</p>
+    </header>
+
+    <div class="plans-grid">
+      <!-- Family Card -->
+      <div class="card" id="cardFamily">
+        <span class="badge" id="badgeFamily">FOR HOMES</span>
+        <div class="card-header">
+          <h2 class="card-title">Family</h2>
+          <p class="card-desc">For parents, homeschoolers, and independent home learners.</p>
+        </div>
+        <div class="price-wrap">
+          <span class="price-num">$3</span>
+          <span class="price-period">/ month</span>
+        </div>
+        <ul class="features-list">
+          <li>Complete access to all 23,400+ interactive skills (K-12)</li>
+          <li>Step-by-step worked examples & diagnostic error tips</li>
+          <li>100% ad-free, distraction-free environment</li>
+          <li>Voice read-aloud support for all questions & lessons</li>
+          <li>Dyslexia-friendly spacing & high-contrast accessibility</li>
+          <li>Offline PWA practice on tablets, phones, and PCs</li>
+          <li>Home learner profiles & mastery journey tracking</li>
+          <li class="muted-feat">Classroom roster & assignment manager</li>
+          <li class="muted-feat">Printable curriculum audit reports</li>
+        </ul>
+        <button class="btn primary" id="btnFamily" data-plan="family">Choose Family — $3/mo</button>
+      </div>
+
+      <!-- Teacher Card -->
+      <div class="card featured" id="cardTeacher">
+        <span class="badge" id="badgeTeacher">EDUCATOR ESSENTIAL</span>
+        <div class="card-header">
+          <h2 class="card-title">Teacher</h2>
+          <p class="card-desc">For classroom teachers, tutors, and intervention specialists.</p>
+        </div>
+        <div class="price-wrap">
+          <span class="price-num">$5</span>
+          <span class="price-period">/ month</span>
+        </div>
+        <ul class="features-list">
+          <li><strong>Everything included in Family</strong></li>
+          <li>Multi-student classroom rosters & group tracking</li>
+          <li>Targeted assignment builder & Fast Math drills</li>
+          <li>Detailed mistake intelligence & learning gap analysis</li>
+          <li>Curriculum audit & standards alignment (CCSS, NGSS, CA-HSS)</li>
+          <li>Printable diagnostic prep packets & study reports</li>
+          <li>Priority educator email support</li>
+        </ul>
+        <button class="btn accent" id="btnTeacher" data-plan="teacher">Choose Teacher — $5/mo</button>
+      </div>
+
+      <!-- School / District Card -->
+      <div class="card" id="cardSchool">
+        <div class="card-header">
+          <h2 class="card-title">School & District</h2>
+          <p class="card-desc">For campus-wide and institutional deployments.</p>
+        </div>
+        <div class="price-wrap">
+          <span class="price-num">Custom</span>
+          <span class="price-period">/ institution</span>
+        </div>
+        <ul class="features-list">
+          <li>Campus-wide access for all students & teachers</li>
+          <li>Custom student data privacy agreements (FERPA / COPPA)</li>
+          <li>LMS integration & Single Sign-On (Google / Clever / SAML)</li>
+          <li>Administrative dashboards & automated roster sync</li>
+          <li>Dedicated training & account management</li>
+        </ul>
+        <p class="small muted" style="font-size:0.82rem; margin-bottom:18px; color:var(--muted);">
+          Self-service purchase is disabled for school accounts. Institutional onboarding requires custom contractual review and data governance agreements.
+        </p>
+        <a href="/support.html" class="btn outline">Contact Enterprise Sales</a>
+      </div>
+    </div>
+
+    <div id="msg"></div>
+
+    <!-- Feature Comparison Table -->
+    <section class="comparison-section">
+      <h2 class="section-title">Feature Comparison</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th>Free Edition</th>
+              <th>Family ($3/mo)</th>
+              <th>Teacher ($5/mo)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Core Curriculum & Skill Engine</td>
+              <td><span class="check">✓</span> Preview</td>
+              <td><span class="check">✓</span> Full</td>
+              <td><span class="check">✓</span> Full</td>
+            </tr>
+            <tr>
+              <td>Ad-Free Learning Experience</td>
+              <td>—</td>
+              <td><span class="check">✓</span> Ad-Free</td>
+              <td><span class="check">✓</span> Ad-Free</td>
+            </tr>
+            <tr>
+              <td>Step-by-Step Solutions & Diagnostics</td>
+              <td>Limited</td>
+              <td><span class="check">✓</span> Unlimited</td>
+              <td><span class="check">✓</span> Unlimited</td>
+            </tr>
+            <tr>
+              <td>Built-in Read-Aloud Voice (TTS)</td>
+              <td><span class="check">✓</span></td>
+              <td><span class="check">✓</span></td>
+              <td><span class="check">✓</span></td>
+            </tr>
+            <tr>
+              <td>Offline Browser PWA & Local Sync</td>
+              <td><span class="check">✓</span></td>
+              <td><span class="check">✓</span></td>
+              <td><span class="check">✓</span></td>
+            </tr>
+            <tr>
+              <td>Classroom Rosters & Student Tracking</td>
+              <td>—</td>
+              <td>—</td>
+              <td><span class="check">✓</span> Included</td>
+            </tr>
+            <tr>
+              <td>Standards Alignment (CCSS, NGSS)</td>
+              <td>—</td>
+              <td>—</td>
+              <td><span class="check">✓</span> Included</td>
+            </tr>
+            <tr>
+              <td>Printable Prep Packets & Study Guides</td>
+              <td>—</td>
+              <td>—</td>
+              <td><span class="check">✓</span> Included</td>
+            </tr>
+            <tr>
+              <td>Self-Service Billing Portal (Cancel anytime)</td>
+              <td>—</td>
+              <td><span class="check">✓</span> Stripe Portal</td>
+              <td><span class="check">✓</span> Stripe Portal</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="faq-section">
+      <h2 class="section-title">Frequently Asked Questions</h2>
+      <div class="faq-item">
+        <div class="faq-q">Can I cancel my subscription at any time?</div>
+        <div class="faq-a">Yes. You have full self-service control through your Stripe Customer Portal. You can cancel with one click at any time, and you will retain access until the end of your paid billing period. There are no cancellation fees or tricky phone calls.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Are there annual contracts or hidden commitments?</div>
+        <div class="faq-a">No. All LearnForge self-service plans are strictly month-to-month ($3/mo for Family, $5/mo for Teacher). No long-term lock-in and no annual upfront commitments.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">How does student privacy work?</div>
+        <div class="faq-a">LearnForge is built with a local-first architecture. Core student learning data and progress remain stored right in the device's browser. Server subscriptions only maintain your billing status and entitlement credentials. We never sell student information or track students across the web.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">Why is School / District self-service purchase disabled?</div>
+        <div class="faq-a">Institutional school deployments require customized data-processing agreements, FERPA and COPPA compliance protocols, and designated district administrators. In accordance with LearnForge commercial guidelines, institutional tiers are provisioned directly with our enterprise team.</div>
+      </div>
+    </section>
+
+    <footer>
+      <p>LearnForge 17.0 RC · <a href="/">Back to App</a> · <a href="/privacy.html">Privacy Policy</a> · <a href="/terms.html">Terms of Service</a> · <a href="/support.html">Customer Support</a></p>
+    </footer>
+  </main>
+
+  <script>
+    const $ = s => document.querySelector(s);
+    let currentUser = null;
+    let currentSubscription = null;
+
+    async function checkSession() {
+      try {
+        const r = await fetch('/commercial-api/auth/session', { credentials: 'same-origin' });
+        if (!r.ok) return null;
+        const d = await r.json();
+        return d.authenticated ? d.user : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function checkEntitlements() {
+      try {
+        const r = await fetch('/commercial-api/entitlements', { credentials: 'same-origin' });
+        if (!r.ok) return null;
+        return await r.json();
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function syncAccount() {
+      try {
+        await fetch('/commercial-api/account', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: '{}'
+        });
+      } catch (e) {}
+    }
+
+    async function syncCheckoutSession(sessionId) {
+      try {
+        const r = await fetch('/commercial-api/checkout-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ session_id: sessionId })
+        });
+        return await r.json();
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function openBillingPortal() {
+      const msg = $('#msg');
+      msg.textContent = 'Opening billing portal…';
+      try {
+        const r = await fetch('/commercial-api/portal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: '{}'
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not open billing portal');
+        location.href = d.url;
+      } catch (e) {
+        msg.textContent = e.message;
+        msg.style.color = '#ef4444';
+      }
+    }
+
+    async function startCheckout(plan) {
+      const msg = $('#msg');
+      msg.textContent = 'Preparing checkout…';
+      msg.style.color = 'var(--text)';
+      try {
+        const r = await fetch('/commercial-api/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ plan })
+        });
+        const d = await r.json();
+        if (r.status === 401) {
+          location.href = '/auth.html';
+          return;
+        }
+        if (!r.ok) throw new Error(d.error || 'Checkout unavailable');
+        location.href = d.url;
+      } catch (e) {
+        msg.textContent = e.message;
+        msg.style.color = '#ef4444';
+      }
+    }
+
+    async function signout() {
+      try {
+        await fetch('/commercial-api/auth/signout', { method: 'POST', credentials: 'same-origin' });
+        location.reload();
+      } catch (e) {
+        location.reload();
+      }
+    }
+
+    (async () => {
+      const params = new URLSearchParams(location.search);
+      const isSuccess = params.get('checkout') === 'success';
+      const isCancelled = params.get('checkout') === 'cancelled';
+      const sessionId = params.get('session_id');
+
+      currentUser = await checkSession();
+      const accountBar = $('#accountBar');
+      const banner = $('#statusBanner');
+
+      if (currentUser) {
+        accountBar.innerHTML = `<span>Signed in as <strong>${currentUser.email}</strong></span> <button class="btn-link" id="signoutBtn">Sign out</button>`;
+        $('#signoutBtn').onclick = signout;
+        syncAccount().catch(() => {});
+
+        // If returned from checkout success with a session_id, sync immediately
+        if (isSuccess && sessionId) {
+          await syncCheckoutSession(sessionId);
+        }
+      } else {
+        accountBar.innerHTML = `<a href="/auth.html">Sign In / Create Account</a>`;
+      }
+
+      // Render banners
+      if (isSuccess) {
+        banner.className = 'banner success';
+        banner.innerHTML = `
+          <div>
+            <strong>🎉 Subscription Successful!</strong>
+            <div>Your LearnForge plan is now active. Thank you for supporting commercial LearnForge.</div>
+          </div>
+          <a href="/" class="btn primary" style="width:auto; padding:10px 22px;">Launch LearnForge App →</a>
+        `;
+      } else if (isCancelled) {
+        banner.className = 'banner info';
+        banner.innerHTML = `
+          <div>
+            <strong>Checkout Cancelled</strong>
+            <div>No charges were made. You can choose a plan whenever you're ready.</div>
+          </div>
+        `;
+      }
+
+      // Check current subscription & entitlements
+      if (currentUser) {
+        const entData = await checkEntitlements();
+        if (entData && entData.subscription && (entData.subscription.status === 'active' || entData.subscription.status === 'trialing')) {
+          currentSubscription = entData.subscription;
+          const planName = currentSubscription.plan === 'teacher' ? 'Teacher Plan' : 'Family Plan';
+          const renewsDate = currentSubscription.current_period_end ? new Date(currentSubscription.current_period_end).toLocaleDateString() : 'Active';
+
+          if (!isSuccess) {
+            banner.className = 'banner info';
+            banner.innerHTML = `
+              <div>
+                <strong>Active Subscription: ${planName}</strong>
+                <div>Billing status: Active · Next renewal: ${renewsDate}</div>
+              </div>
+              <button class="btn portal-btn" id="portalBtn">Manage Billing & Invoices</button>
+            `;
+            $('#portalBtn').onclick = openBillingPortal;
+          }
+
+          // Highlight current plan card
+          if (currentSubscription.plan === 'family') {
+            $('#badgeFamily').className = 'badge active-badge';
+            $('#badgeFamily').textContent = 'YOUR ACTIVE PLAN';
+            $('#btnFamily').textContent = 'Current Plan ✓';
+            $('#btnFamily').className = 'btn disabled';
+            $('#btnFamily').onclick = openBillingPortal;
+          } else if (currentSubscription.plan === 'teacher') {
+            $('#badgeTeacher').className = 'badge active-badge';
+            $('#badgeTeacher').textContent = 'YOUR ACTIVE PLAN';
+            $('#btnTeacher').textContent = 'Current Plan ✓';
+            $('#btnTeacher').className = 'btn disabled';
+            $('#btnTeacher').onclick = openBillingPortal;
+          }
+        }
+      }
+
+      // Wire plan buttons
+      $('#btnFamily').onclick = () => {
+        if (currentSubscription?.plan === 'family') {
+          openBillingPortal();
+        } else {
+          startCheckout('family');
+        }
+      };
+
+      $('#btnTeacher').onclick = () => {
+        if (currentSubscription?.plan === 'teacher') {
+          openBillingPortal();
+        } else {
+          startCheckout('teacher');
+        }
+      };
+    })();
+  </script>
+</body>
+</html>

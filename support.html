@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>LearnForge Customer Support & Help Center</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --primary: #0f172a;
+      --accent: #2563eb;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 40px 20px 80px;
+    }
+    main { max-width: 760px; margin: 0 auto; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .top { margin-bottom: 24px; font-size: 0.95rem; }
+    h1 { font-size: 2.2rem; font-weight: 800; margin-bottom: 8px; }
+    .subtitle { color: var(--muted); font-size: 1.1rem; margin-bottom: 32px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px 28px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .card h2 { font-size: 1.25rem; font-weight: 700; margin-bottom: 8px; }
+    .card p { color: #334155; margin-bottom: 12px; }
+    .card p:last-child { margin-bottom: 0; }
+    .badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #e0f2fe;
+      color: #0369a1;
+      margin-bottom: 8px;
+    }
+    .channels {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .channel-box {
+      background: #f1f5f9;
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .channel-box strong { display: block; font-size: 1rem; margin-bottom: 4px; }
+    .channel-box span { font-size: 0.88rem; color: var(--muted); }
+    footer { margin-top: 48px; border-top: 1px solid var(--border); padding-top: 24px; font-size: 0.9rem; color: var(--muted); text-align: center; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="top"><a href="/">← Back to LearnForge</a> · <a href="/pricing.html">Plans & Pricing</a></div>
+    <h1>LearnForge Customer Support</h1>
+    <p class="subtitle">Assistance with commercial subscriptions, accounts, curriculum features, and enterprise deployments.</p>
+
+    <div class="card">
+      <span class="badge">Billing & Subscriptions</span>
+      <h2>Subscription & Billing Help</h2>
+      <p>Need to manage payment methods, download monthly VAT/tax invoices, update your plan, or cancel your subscription?</p>
+      <p>Subscribers can access the self-service <a href="/pricing.html">Stripe Billing Portal</a> at any time with one click.</p>
+    </div>
+
+    <div class="card">
+      <span class="badge">Support Channels</span>
+      <h2>Contact the Team</h2>
+      <p>Our team is available to assist families, educators, and schools.</p>
+      <div class="channels">
+        <div class="channel-box">
+          <strong>Family & Parent Support</strong>
+          <span>Account help, learning profiles & billing</span>
+          <div style="margin-top:8px;"><a href="mailto:support@learnforge.ai">support@learnforge.ai</a></div>
+        </div>
+        <div class="channel-box">
+          <strong>Teacher & Educator Inquiries</strong>
+          <span>Classroom rosters, curriculum audit & prep packets</span>
+          <div style="margin-top:8px;"><a href="mailto:educators@learnforge.ai">educators@learnforge.ai</a></div>
+        </div>
+        <div class="channel-box">
+          <strong>School & Institutional Sales</strong>
+          <span>FERPA/COPPA review, district DPA & SSO</span>
+          <div style="margin-top:8px;"><a href="mailto:enterprise@learnforge.ai">enterprise@learnforge.ai</a></div>
+        </div>
+        <div class="channel-box">
+          <strong>Data Privacy & Security</strong>
+          <span>Data export, erasure requests & compliance</span>
+          <div style="margin-top:8px;"><a href="mailto:privacy@learnforge.ai">privacy@learnforge.ai</a></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="badge">Technical Notes</span>
+      <h2>Local Data & Offline Mode</h2>
+      <p>LearnForge operates local-first. If you switch devices or clear your browser data, use the in-app <strong>Privacy & Data</strong> center (`#/privacy`) to export a portable JSON backup of your progress, draft projects, and personalized accessibility settings.</p>
+    </div>
+
+    <footer>
+      <p>LearnForge 17.0 RC · <a href="/privacy.html">Privacy Policy</a> · <a href="/terms.html">Terms of Service</a> · <a href="/pricing.html">Plans & Pricing</a></p>
+    </footer>
+  </main>
+</body>
+</html>

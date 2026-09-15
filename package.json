@@ -1,0 +1,21 @@
+{
+  "name": "learnforge-commercial-netlify",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "netlify dev",
+    "preview": "node scripts/preview-server.mjs",
+    "package": "node scripts/package-release.mjs",
+    "check": "tsc --noEmit --module esnext --moduleResolution bundler --target es2022 --types node --skipLibCheck netlify/functions/*.mts netlify/functions/_shared/*.ts",
+    "test": "node tests/test-commercial.mjs && node tests/test-webhook-signatures.mjs"
+  },
+  "dependencies": {
+    "@netlify/database": "latest",
+    "@netlify/functions": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/pg": "latest",
+    "typescript": "latest"
+  }
+}
