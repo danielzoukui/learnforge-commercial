@@ -1,0 +1,192 @@
+{
+  "$schema": "https://api.northflank.com/v1/schemas/template",
+  "apiVersion": "v1.2",
+  "name": "learnforge-commercial",
+  "description": "LearnForge Commercial: PostgreSQL 16 addon + a combined service that builds this repository's Dockerfile and runs the portable runtime (static product pages + all 15 /commercial-api routes). Secrets are injected from template arguments; the database connection string is linked straight from the addon.",
+  "options": {
+    "autorun": false,
+    "concurrencyPolicy": "queue"
+  },
+  "arguments": {
+    "SUPABASE_URL": "",
+    "SUPABASE_PUBLISHABLE_KEY": "",
+    "STRIPE_SECRET_KEY": "",
+    "STRIPE_WEBHOOK_SECRET": "",
+    "STRIPE_PRICE_FAMILY": "price_1UEz7K3ItjkrrGb20QhuWGdd",
+    "STRIPE_PRICE_TEACHER": "price_1UEz7Q3ItjkrrGb2WzldHDJt"
+  },
+  "spec": {
+    "kind": "Workflow",
+    "spec": {
+      "type": "sequential",
+      "steps": [
+        {
+          "kind": "Project",
+          "ref": "project",
+          "spec": {
+            "name": "learnforge-commercial",
+            "region": "europe-west",
+            "networking": {
+              "allowedIngressProjects": []
+            }
+          }
+        },
+        {
+          "kind": "Workflow",
+          "spec": {
+            "type": "sequential",
+            "context": {
+              "projectId": "${refs.project.id}"
+            },
+            "steps": [
+              {
+                "kind": "Addon",
+                "ref": "database",
+                "spec": {
+                  "name": "learnforge-postgres",
+                  "type": "postgresql",
+                  "version": "16",
+                  "tlsEnabled": true,
+                  "externalAccessEnabled": false,
+                  "typeSpecificFields": {
+                    "postgresDatabase": "learnforge"
+                  },
+                  "billing": {
+                    "replicas": 1,
+                    "storage": 4096,
+                    "storageClass": "ssd",
+                    "deploymentPlan": "nf-compute-20"
+                  }
+                }
+              },
+              {
+                "kind": "CombinedService",
+                "ref": "learnforge",
+                "spec": {
+                  "name": "learnforge",
+                  "vcsData": {
+                    "projectType": "github",
+                    "projectUrl": "https://github.com/danielzoukui/learnforge-commercial",
+                    "projectBranch": "main"
+                  },
+                  "billing": {
+                    "deploymentPlan": "nf-compute-20",
+                    "buildPlan": "nf-compute-20"
+                  },
+                  "deployment": {
+                    "instances": 1,
+                    "docker": {
+                      "configType": "default"
+                    },
+                    "storage": {
+                      "ephemeralStorage": {
+                        "storageSize": 1024
+                      },
+                      "shmSize": 64
+                    }
+                  },
+                  "ports": [
+                    {
+                      "name": "http",
+                      "internalPort": 8080,
+                      "protocol": "HTTP",
+                      "public": true,
+                      "domains": [],
+                      "security": {
+                        "policies": [],
+                        "credentials": []
+                      },
+                      "disableNfDomain": false
+                    }
+                  ],
+                  "healthChecks": [
+                    {
+                      "protocol": "HTTP",
+                      "type": "livenessProbe",
+                      "path": "/_runtime/health",
+                      "port": 8080,
+                      "initialDelaySeconds": 20,
+                      "periodSeconds": 30,
+                      "timeoutSeconds": 5,
+                      "failureThreshold": 3,
+                      "successThreshold": 1
+                    }
+                  ],
+                  "buildSettings": {
+                    "dockerfile": {
+                      "buildEngine": "kaniko",
+                      "useCache": true,
+                      "dockerWorkDir": "/",
+                      "dockerFilePath": "/Dockerfile",
+                      "buildkit": {
+                        "useInternalCache": false,
+                        "internalCacheStorage": 16384
+                      }
+                    }
+                  },
+                  "buildConfiguration": {
+                    "pathIgnoreRules": [
+                      "*.zip",
+                      "*.md"
+                    ],
+                    "isAllowList": false,
+                    "ciIgnoreFlagsEnabled": false
+                  },
+                  "runtimeEnvironment": {},
+                  "runtimeFiles": {},
+                  "buildArguments": {},
+                  "buildFiles": {},
+                  "disabledCI": false
+                }
+              },
+              {
+                "kind": "SecretGroup",
+                "ref": "secrets",
+                "spec": {
+                  "name": "learnforge-secrets",
+                  "type": "secret",
+                  "secretType": "environment-arguments",
+                  "priority": 10,
+                  "secrets": {
+                    "variables": {
+                      "NODE_ENV": "production",
+                      "HOST": "0.0.0.0",
+                      "PORT": "8080",
+                      "PUBLIC_SITE_URL": "https://${refs.learnforge.ports.0.dns}",
+                      "SUPABASE_URL": "${args.SUPABASE_URL}",
+                      "SUPABASE_PUBLISHABLE_KEY": "${args.SUPABASE_PUBLISHABLE_KEY}",
+                      "STRIPE_SECRET_KEY": "${args.STRIPE_SECRET_KEY}",
+                      "STRIPE_WEBHOOK_SECRET": "${args.STRIPE_WEBHOOK_SECRET}",
+                      "STRIPE_PRICE_FAMILY": "${args.STRIPE_PRICE_FAMILY}",
+                      "STRIPE_PRICE_TEACHER": "${args.STRIPE_PRICE_TEACHER}",
+                      "RUN_MIGRATIONS_ON_BOOT": "true"
+                    },
+                    "files": {}
+                  },
+                  "addonDependencies": [
+                    {
+                      "addonId": "${refs.database.id}",
+                      "keys": [
+                        {
+                          "keyName": "POSTGRES_URI",
+                          "aliases": [
+                            "DATABASE_URL"
+                          ]
+                        }
+                      ]
+                    }
+                  ],
+                  "restrictions": {
+                    "restricted": false,
+                    "nfObjects": [],
+                    "tags": []
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

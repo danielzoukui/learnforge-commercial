@@ -5,3 +5,6 @@ node_modules/
 .env
 .env.*
 .DS_Store
+
+# Deployment templates must be committed even though real .env files are not
+!deploy/.env.example

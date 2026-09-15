@@ -4,6 +4,140 @@
 [functions]
   directory = "netlify/functions"
 
+# ---------------------------------------------------------------------------
+# Static exposure hardening
+#
+# `publish = "."` publishes the whole repository root, which makes sources,
+# release archives and CI configuration *eligible* for static serving (an
+# exposure that does not exist at API level — the 15 functions are only reachable
+# on their declared /commercial-api/* routes, and unknown routes 404).
+#
+# These forced rules rewrite repository internals to an internal 404 responder
+# (`/commercial-api/forbidden` is not a declared function route, so the API
+# returns `{"error":"Endpoint not found"}` with status 404), keeping the response
+# honest while guaranteeing the file is never transmitted.
+#
+# Verified by `npm run test:exposure` / `scripts/check-netlify-exposure.mjs`.
+# ---------------------------------------------------------------------------
+
+[[redirects]]
+  from = "/netlify/*"
+  to = "/commercial-api/forbidden?source=functions-and-migrations"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/runtime/*"
+  to = "/commercial-api/forbidden?source=portable-runtime"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/deploy/*"
+  to = "/commercial-api/forbidden?source=deployment-runbooks"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/tests/*"
+  to = "/commercial-api/forbidden?source=tests"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/scripts/*"
+  to = "/commercial-api/forbidden?source=build-scripts"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/.github/*"
+  to = "/commercial-api/forbidden?source=ci-configuration"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/.git/*"
+  to = "/commercial-api/forbidden?source=vcs-metadata"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/*.zip"
+  to = "/commercial-api/forbidden?source=release-archives"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/*.mts"
+  to = "/commercial-api/forbidden?source=typescript-sources"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/*.ts"
+  to = "/commercial-api/forbidden?source=typescript-sources"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/*.log"
+  to = "/commercial-api/forbidden?source=logs"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/package.json"
+  to = "/commercial-api/forbidden?source=manifest"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/package-lock.json"
+  to = "/commercial-api/forbidden?source=manifest"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/netlify.toml"
+  to = "/commercial-api/forbidden?source=platform-config"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/Dockerfile"
+  to = "/commercial-api/forbidden?source=container-build"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/.env"
+  to = "/commercial-api/forbidden?source=environment"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/.env.*"
+  to = "/commercial-api/forbidden?source=environment"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/.gitignore"
+  to = "/commercial-api/forbidden?source=vcs-metadata"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/.dockerignore"
+  to = "/commercial-api/forbidden?source=container-build"
+  status = 404
+  force = true
+
+# ---------------------------------------------------------------------------
+# Security headers
+# ---------------------------------------------------------------------------
+
 [[headers]]
   for = "/*"
   [headers.values]

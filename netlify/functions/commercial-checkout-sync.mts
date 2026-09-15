@@ -58,10 +58,26 @@ export default async (req: Request, _context: Context) => {
   const subscription = session?.subscription;
   const subscriptionId = normalizeId(subscription);
 
-  if (subscription && typeof subscription === "object") {
-    const status = String(subscription.status || "active");
-    const currentPeriodEnd = subscription.current_period_end
-      ? new Date(Number(subscription.current_period_end) * 1000).toISOString()
+  // `expand[]=subscription` normally returns the object, but a different Stripe
+  // API version or a retried request can return only the id. Resolve it the same
+  // way the webhook does so a paying customer is entitled immediately instead of
+  // waiting for webhook delivery.
+  let subscriptionDetails = subscription && typeof subscription === "object" ? subscription : null;
+  if (!subscriptionDetails && subscriptionId) {
+    try {
+      const subscriptionRes = await fetch(`https://api.stripe.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+        headers: { Authorization: `Bearer ${secret}` }
+      });
+      if (subscriptionRes.ok) subscriptionDetails = await subscriptionRes.json();
+    } catch (e) {
+      console.error("Subscription lookup failed during checkout sync", e);
+    }
+  }
+
+  if (subscriptionDetails) {
+    const status = String(subscriptionDetails.status || "active");
+    const currentPeriodEnd = subscriptionDetails.current_period_end
+      ? new Date(Number(subscriptionDetails.current_period_end) * 1000).toISOString()
       : null;
 
     if (subscriptionId) {
