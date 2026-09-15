@@ -1,0 +1,19 @@
+# Keep the build context small and prevent accidental publication of
+# release archives, local state or CI configuration.
+node_modules
+.git
+.gitignore
+.github
+.netlify
+.netlify-state
+*.zip
+*.log
+.env
+.env.*
+deploy
+docs
+tests
+scripts
+Dockerfile
+.dockerignore
+codeql-results.sarif

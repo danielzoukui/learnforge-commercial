@@ -1,0 +1,83 @@
+# LearnForge Commercial — single-host production stack (Oracle Always Free, any VM)
+#
+#   cp deploy/.env.example .env    # fill in domain, password, keys
+#   docker compose -f deploy/docker-compose.yml --env-file .env up -d --build
+#
+# Components: PostgreSQL 16 (internal network only), a one-shot migration job,
+# the app image built from this repository, and Caddy for automatic TLS.
+
+name: learnforge-commercial
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: learnforge
+      POSTGRES_USER: learnforge
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U learnforge -d learnforge"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    # Intentionally no `ports:` — the database is reachable only on the internal
+    # compose network. Use `docker compose exec db psql` for manual access.
+
+  migrate:
+    build:
+      context: ..
+    command: ["npm", "run", "migrate"]
+    environment:
+      DATABASE_URL: postgres://learnforge:${POSTGRES_PASSWORD}@db:5432/learnforge
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build:
+      context: ..
+    restart: unless-stopped
+    environment:
+      PORT: "8080"
+      HOST: 0.0.0.0
+      NODE_ENV: production
+      DATABASE_URL: postgres://learnforge:${POSTGRES_PASSWORD}@db:5432/learnforge
+      PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:?PUBLIC_SITE_URL must be set in .env}
+      SUPABASE_URL: ${SUPABASE_URL:?SUPABASE_URL must be set in .env}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY?SUPABASE_PUBLISHABLE_KEY must be set in .env}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY?STRIPE_SECRET_KEY must be set in .env}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET?STRIPE_WEBHOOK_SECRET must be set in .env}
+      STRIPE_PRICE_FAMILY: ${STRIPE_PRICE_FAMILY?STRIPE_PRICE_FAMILY must be set in .env}
+      STRIPE_PRICE_TEACHER: ${STRIPE_PRICE_TEACHER?STRIPE_PRICE_TEACHER must be set in .env}
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    # No public port: Caddy terminates TLS and proxies to app:8080 on the
+    # internal network. Add `ports: ["8080:8080"]` temporarily if you need to
+    # test the app before DNS is pointed at this host.
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN must be set in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+
+volumes:
+  db-data:
+  caddy-data:
+  caddy-config:

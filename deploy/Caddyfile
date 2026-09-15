@@ -1,0 +1,22 @@
+# Caddy terminates TLS with an automatic Let's Encrypt certificate and proxies
+# every request to the app container. Point an A record for {$DOMAIN} at this
+# host before starting the stack, or issuance will fail.
+#
+# Security headers, cache policy and gzip are set by the application itself
+# (runtime/router.mjs mirrors netlify.toml), so they are not duplicated here.
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	reverse_proxy app:8080 {
+		# Keep the original host/proto so Stripe redirect URLs and
+		# `new URL(req.url).origin` resolve to the public origin.
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

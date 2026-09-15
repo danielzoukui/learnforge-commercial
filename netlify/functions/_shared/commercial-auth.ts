@@ -34,7 +34,17 @@ export function getRefreshToken(req: Request): string | null {
 export function authProviderConfig() {
   const url = (Netlify.env.get("SUPABASE_URL") || "").replace(/\/$/, "");
   const key = Netlify.env.get("SUPABASE_PUBLISHABLE_KEY") || Netlify.env.get("SUPABASE_ANON_KEY") || "";
-  if (!url || !key) throw new Error("Hosted authentication is not configured yet");
+  if (!url || !key) {
+    // Thrown as a Response so every host reports a clear 503 (configuration)
+    // instead of an opaque 500 (unhandled exception).
+    throw new Response(
+      JSON.stringify({
+        error: "Hosted authentication is not configured yet",
+        hint: "Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY (or SUPABASE_ANON_KEY)."
+      }),
+      { status: 503, headers: { "content-type": "application/json" } }
+    );
+  }
   return { url, key };
 }
 

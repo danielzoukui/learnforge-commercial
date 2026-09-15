@@ -133,9 +133,34 @@ Visit:
 
 ---
 
+## 🚀 Production Hosting
+
+The API is host-portable: the same `netlify/functions/*.mts` handlers run on
+Netlify **or** on any Node 22.18+ / Docker host through `runtime/`, with no source
+changes between targets.
+
+```bash
+npm start                          # production server on 0.0.0.0:8080
+npm run migrate --status           # which of the 3 migrations are pending
+npm run migrate                    # apply them (idempotent, tracked)
+```
+
+| Document | Contents |
+| --- | --- |
+| [`HOSTING_OPTIONS.md`](HOSTING_OPTIONS.md) | Verified free-tier comparison (Sept 2026), corrections to earlier advice, and the recommended production path |
+| [`deploy/PORTABLE_RUNTIME.md`](deploy/PORTABLE_RUNTIME.md) | How the portability layer works, env-var mapping, parity notes, endpoint list |
+| [`deploy/NORTHFLANK.md`](deploy/NORTHFLANK.md) | Recommended: free, always-on service + PostgreSQL addon |
+| [`deploy/ORACLE_CLOUD_ALWAYS_FREE.md`](deploy/ORACLE_CLOUD_ALWAYS_FREE.md) | Maximum free headroom: ARM VM + Docker Compose + Caddy TLS |
+
+`npm run preview` remains a mock API server for UI work only; `npm start` is the
+real runtime, including database, auth proxy and Stripe webhook verification.
+
+---
+
 ## ⚙️ Environment Configuration
 
-Set these variables in your deployment environment (Netlify Site Configuration):
+Set these variables in your deployment environment (Netlify site settings, or the
+container/VM environment for the portable runtime):
 
 ```bash
 # Public URL

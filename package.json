@@ -1,17 +1,24 @@
 {
-  "name": "learnforge-commercial-netlify",
+  "name": "learnforge-commercial",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
   "scripts": {
     "dev": "netlify dev",
+    "start": "node --disable-warning=ExperimentalWarning runtime/server.mjs",
     "preview": "node scripts/preview-server.mjs",
+    "migrate": "node runtime/migrate.mjs",
+    "migrate:status": "node runtime/migrate.mjs --status",
     "package": "node scripts/package-release.mjs",
     "check": "tsc --noEmit --module esnext --moduleResolution bundler --target es2022 --types node --skipLibCheck netlify/functions/*.mts netlify/functions/_shared/*.ts",
-    "test": "node tests/test-commercial.mjs && node tests/test-webhook-signatures.mjs"
+    "test": "node tests/test-commercial.mjs && node tests/test-webhook-signatures.mjs && node tests/test-portable-runtime.mjs"
   },
   "dependencies": {
     "@netlify/database": "latest",
-    "@netlify/functions": "latest"
+    "@netlify/functions": "latest",
+    "pg": "^8.16.3"
   },
   "devDependencies": {
     "@types/node": "latest",

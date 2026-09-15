@@ -36,7 +36,17 @@ No prices are hard-coded in this package.
 This package is not a claim of legal, security, COPPA/FERPA, accessibility, or payment-compliance certification. Before taking paid customers, complete production authentication, hosted account recovery, Stripe webhook entitlement synchronization, hosted data export/deletion, child/school consent flows, legal review, monitoring, backup/restore tests, accessibility testing, and incident-response/support operations.
 
 ## Deployment
-This is source code that requires a Netlify build so Functions and Database migrations are provisioned. A simple drag-and-drop static deploy will serve the HTML pages but will not activate the backend functions/database build pipeline.
+This source tree supports two production targets. A simple drag-and-drop static deploy is not one of them: it would serve the HTML pages without the API, authentication, or entitlement logic.
+
+1. **Netlify** — requires a Netlify build so Functions and Database migrations are provisioned (`netlify.toml`, `netlify/functions/`, `netlify/database/migrations/`).
+2. **Any Node 22.18+ / Docker host** — `runtime/` mounts the same 15 handlers on their declared routes and runs the same migrations against any PostgreSQL:
+
+   ```bash
+   DATABASE_URL=postgres://... npm run migrate   # applies the 3 migrations
+   npm start                                    # serves pages + /commercial-api/*
+   ```
+
+   See [`HOSTING_OPTIONS.md`](HOSTING_OPTIONS.md) for the verified free-tier hosting recommendation and [`deploy/PORTABLE_RUNTIME.md`](deploy/PORTABLE_RUNTIME.md) for the runtime details. The handler sources are byte-for-byte identical on both targets; only `Netlify.env` and `getDatabase()` are shimmed.
 
 ## Hosted authentication gate
 This package expects a hosted Supabase Auth project before commercial account endpoints are enabled.
