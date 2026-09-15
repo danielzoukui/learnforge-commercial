@@ -144,7 +144,13 @@ npm start                          # production server on 0.0.0.0:8080
 npm run migrate --status           # which of the 3 migrations are pending
 npm run migrate                    # apply them (idempotent, tracked)
 npm run test:e2e                   # full purchase lifecycle against a real PostgreSQL
+npm run test:golive                # go-live automation against mock provider APIs
 npm run preflight -- --url https://your-domain   # go-live readiness check
+
+# Go live in one command (Northflank project → database → secrets → service →
+# Supabase redirect → Stripe webhook → real test-mode purchase). Rehearse first:
+npm run golive -- --dry-run
+npm run golive
 ```
 
 | Document | Contents |

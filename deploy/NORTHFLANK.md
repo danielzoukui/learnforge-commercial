@@ -31,9 +31,13 @@ PostgreSQL 16 addon → combined service built from this repository's `Dockerfil
    [`northflank-secrets.example.env`](northflank-secrets.example.env).
 3. **Run the template**, then watch the three nodes finish. The service builds the
    Dockerfile and deploys on port 8080 with health check `/_runtime/health`.
-4. **Apply the migrations** (one of the two options below) — the app serves traffic
-   before this, but `/commercial-api/health` reports 503 until the schema exists.
-5. **Verify**, then finish the go-live steps.
+4. **Migrations apply themselves.** The template sets `RUN_MIGRATIONS_ON_BOOT=true`,
+   so the service applies the three migrations during boot — idempotently, logged
+   line by line — right after the database handshake. The app serves traffic before
+   that finishes, but `/commercial-api/health` reports 503 until the schema exists.
+   If you would rather run them explicitly, use [Apply the migrations](#apply-the-migrations).
+5. **Verify**, then finish the go-live steps — or skip steps 2–5 entirely and use
+   [the automation](#go-live-steps--one-command) below.
 
 > **Plan names:** the template uses `nf-compute-20` plans. If your team is on the
 > free Sandbox and the run rejects them, pick the sandbox-eligible plan in the UI
@@ -125,7 +129,57 @@ variables are missing and whether the database answered at boot.
    addon's `POSTGRES_URI` with the alias `DATABASE_URL`.
 5. Continue with *Apply the migrations* and *Verify* above.
 
-## Go-live steps
+## Go-live steps — one command
+
+`npm run golive` performs the whole sequence by API: Northflank project → PostgreSQL
+addon → secret group with `DATABASE_URL` linked → combined service → build → wait for
+the public URL → Supabase redirect URLs → Stripe webhook endpoint → signing secret
+written back into the service → preflight → **a real test-mode purchase**. Every step
+looks for the resource by name first, so re-running after a failure resumes instead of
+duplicating.
+
+```bash
+export NORTHFLANK_API_TOKEN=...      # Northflank → Account settings → API tokens
+export SUPABASE_ACCESS_TOKEN=sbp_... # supabase.com/dashboard/account/tokens
+export SUPABASE_URL=https://<ref>.supabase.co
+export STRIPE_SECRET_KEY=sk_test_... # start in test mode
+export STRIPE_PRICE_FAMILY=price_... # optional: the live Family price is the default
+export STRIPE_PRICE_TEACHER=price_... # optional
+
+npm run golive -- --dry-run          # rehearse: prints every request, sends nothing
+npm run golive                       # run the whole sequence
+```
+
+Useful flags: `--phase=infra|supabase|stripe|verify` runs one stage, `--url https://…`
+sets the site origin when it is not discoverable, `--project <name>` overrides the
+project name, `--branch <name>` builds a different branch, `--skip-purchase` stops
+before the purchase, and `--quiet` reduces output to outcomes only.
+
+### The test purchase
+
+`--email/--password` (or `TEST_PURCHASE_EMAIL`/`TEST_PURCHASE_PASSWORD`) point at an
+account on the deployment. The automation creates the account if needed, then drives
+Stripe's API with `pm_card_visa` — the API equivalent of typing
+`4242 4242 4242 4242` — so a genuine `customer.subscription.created` event is
+delivered to your live webhook. It then polls `/commercial-api/entitlements` until
+`learnforge.family` appears, cancels the subscription, and asserts the entitlement is
+gone. Nothing is simulated: the events, the signature, the database writes and the
+revocation are all real.
+
+```
+✓ created Stripe webhook endpoint (we_…) for https://<domain>/commercial-api/stripe-webhook
+✓ test purchase granted learnforge.family
+✓ cancellation revoked the entitlement
+```
+
+Finish by switching `STRIPE_SECRET_KEY` (and the webhook endpoint) to live keys and
+re-running `npm run golive -- --phase=stripe`: creating the live endpoint returns a
+new signing secret, which the automation writes into the secret group and restarts
+the service for.
+
+### Click-through equivalents
+
+If you prefer the dashboard, the same four steps are:
 
 1. **Domain:** add your custom domain to the service and create the DNS record
    Northflank shows; TLS is automatic. Update `PUBLIC_SITE_URL` to the final HTTPS
@@ -160,8 +214,24 @@ environment — `npm test` (62 checks) plus `npm run test:e2e` (13 checks):
 | Checkout sync self-heals when Stripe returns an unexpanded subscription id | drift simulated, then recovered |
 | Billing portal opens from the persisted customer id | portal session created |
 
-Not verifiable without your accounts: the Docker image build on Northflank's
-builder, and a live Stripe/Supabase round trip. Both are steps 3–4 above.
+The go-live automation has its own suite — `npm run test:golive` (9 checks). It runs
+`scripts/golive.mjs` against mock Northflank/Stripe/Supabase APIs at their documented
+endpoints, while the application, the database and the webhook signature check are
+real:
+
+| Verified | Evidence |
+| --- | --- |
+| The pipeline issues the whole resource graph in order | 26 provider calls: project → addon → secrets → service → build → webhook → auth config |
+| Payloads match the production contract | PostgreSQL 16 addon, `POSTGRES_URI`→`DATABASE_URL`, port 8080, `GET /_runtime/health`, `/Dockerfile`, branch `main` |
+| The Stripe signing secret reaches the service | secret patched onto the secret group, then the service is restarted |
+| Supabase receives the deployed origin | `site_url` + `uri_allow_list` updated |
+| A test purchase grants and then loses the entitlement | real signup, real webhook delivery, real database rows |
+| Re-running is safe | second run creates no duplicate resources and reports `already exists` |
+| `--dry-run` sends nothing | zero provider calls, zero side effects |
+| Secrets never reach the logs | `sk_…`, `whsec_…` redacted from all output |
+
+Not verifiable without your accounts: the Docker image build on Northflank's builder,
+and a live Stripe/Supabase round trip. Both are steps 3–4 above.
 
 ## Operating notes
 

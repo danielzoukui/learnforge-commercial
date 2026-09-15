@@ -78,3 +78,6 @@ jobs:
 
       - name: Run purchase lifecycle against PostgreSQL
         run: npm run test:e2e
+
+      - name: Verify go-live automation (mock provider APIs, real app + PostgreSQL)
+        run: npm run test:golive

@@ -102,10 +102,14 @@
                   "healthChecks": [
                     {
                       "protocol": "HTTP",
+                      "type": "livenessProbe",
                       "path": "/_runtime/health",
                       "port": 8080,
                       "initialDelaySeconds": 20,
-                      "periodSeconds": 30
+                      "periodSeconds": 30,
+                      "timeoutSeconds": 5,
+                      "failureThreshold": 3,
+                      "successThreshold": 1
                     }
                   ],
                   "buildSettings": {
@@ -154,7 +158,8 @@
                       "STRIPE_SECRET_KEY": "${args.STRIPE_SECRET_KEY}",
                       "STRIPE_WEBHOOK_SECRET": "${args.STRIPE_WEBHOOK_SECRET}",
                       "STRIPE_PRICE_FAMILY": "${args.STRIPE_PRICE_FAMILY}",
-                      "STRIPE_PRICE_TEACHER": "${args.STRIPE_PRICE_TEACHER}"
+                      "STRIPE_PRICE_TEACHER": "${args.STRIPE_PRICE_TEACHER}",
+                      "RUN_MIGRATIONS_ON_BOOT": "true"
                     },
                     "files": {}
                   },

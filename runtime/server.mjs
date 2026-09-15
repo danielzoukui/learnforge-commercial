@@ -111,6 +111,24 @@ server.listen(PORT, HOST, async () => {
   const db = await verifyDatabase();
   if (db.ok) {
     console.log(`[database] ready (driver=${db.driver})`);
+
+    // Opt-in schema bootstrap for hosts without a separate migration step
+    // (Northflank, single-container deploys). Idempotent and tracked, so it is
+    // safe on every boot and on rolling restarts. A failure is reported and the
+    // process keeps serving: /commercial-api/health then answers 503, which is
+    // easier to diagnose than a crash loop.
+    if (String(process.env.RUN_MIGRATIONS_ON_BOOT || "").trim().toLowerCase() === "true") {
+      try {
+        const { findMigrations } = await import("./migrate.mjs");
+        const { getDatabase, runMigrations } = await import("./database.mjs");
+        const results = await runMigrations(getDatabase(), findMigrations(), {});
+        for (const result of results) console.log(`[migrate] ${result.filename} — ${result.status}`);
+        console.log(`[migrate] schema up to date (${results.length} migration file(s) checked)`);
+      } catch (error) {
+        console.error(`[migrate] FAILED: ${error?.message || error}`);
+        console.error("[migrate] /commercial-api/health stays 503 until the schema is applied.");
+      }
+    }
   } else {
     console.warn(`[database] NOT ready: ${db.error || "connection failed"}`);
     console.warn("[database] /commercial-api/health returns 503 until PostgreSQL is configured.");

@@ -1,9 +1,9 @@
 # LearnForge Commercial — Deployment Execution Report
 
-**Executed:** 15 September 2026 · **Branch:** `arena/01a0a641-learnforge-commercial` · **Pull request:** [#2](https://github.com/danielzoukui/learnforge-commercial/pull/2) · **Head commit:** `922a0c0`
+**Executed:** 15 September 2026 · **Branch:** `arena/01a0a641-learnforge-commercial` · **Pull request:** [#2](https://github.com/danielzoukui/learnforge-commercial/pull/2) · **Head commit:** `@HEAD_COMMIT@`
 
-**Distribution artifact:** `LearnForge_COMMERCIAL_MONETIZATION_COMPLETE_v17.2.zip` — 59 files, 2,317,549 bytes,
-SHA-256 `9f314fafce345dda65536ca2fb988d4fcd24128741ed03eee1de01816697fb6c`
+**Distribution artifact:** `LearnForge_COMMERCIAL_MONETIZATION_COMPLETE_v17.2.zip` — 65 files, 2,343,151 bytes,
+SHA-256 `906923fc7a9d91ce6e540d3b1905ec1daa0de85061698192a4d4f1b9662813e5`
 (this report is intentionally *not* inside the archive, so the hash stays stable).
 
 ---
@@ -197,8 +197,13 @@ control) are listed in `deploy/northflank-secrets.example.env`: `SUPABASE_URL`,
 `SUPABASE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (the two Stripe price ids
 default to the live Family/Teacher prices).
 
-Then: run the template → apply migrations (a Northflank job running `npm run migrate`, or temporarily
-enabling addon external access and running it locally) → `npm run preflight -- --url https://<domain>`.
+The template now also sets `RUN_MIGRATIONS_ON_BOOT=true`, so **the service applies the three migrations
+itself** during boot — idempotently, each file logged as it lands — right after the database handshake
+succeeds. That removes the manual migration job (and the external-access detour) from your path; the job
+and the local `npm run migrate` route are still documented as fallbacks.
+
+**Or skip the clicking entirely:** `npm run golive` (section 6) does the project, the addon, the secret
+group, the service, the build, the Supabase redirect, the Stripe webhook and a real test purchase by API.
 Full detail, expected console output and the plan-name caveat are in
 [`deploy/NORTHFLANK.md`](deploy/NORTHFLANK.md).
 
@@ -209,7 +214,102 @@ in the service form; `/_runtime/health` answers either way.
 
 ---
 
-## 6. Everything executed in this session
+## 6. Go-live automation — the sequence you asked for, as commands
+
+You asked for the go-live order to be executed: Northflank account → template + 4 secrets → migrations →
+Stripe webhook + Supabase redirect → one `4242…` test purchase → flip to live keys. The account creation
+is yours (no API can accept a card on your behalf), and the three provider APIs are unreachable from
+this environment — `api.northflank.com`, `api.stripe.com` and `api.supabase.com` all fail DNS/TLS here,
+while `github.com` and `npmjs.com` work — so I built the sequence as automation that runs **on your
+machine** and verified it here against local mock implementations of those APIs.
+
+Your steps, as commands:
+
+```bash
+# 0. credentials in the shell (never committed; all four provider tokens are yours)
+export NORTHFLANK_API_TOKEN=...       # northflank.com → Account settings → API tokens
+export SUPABASE_ACCESS_TOKEN=sbp_...  # supabase.com/dashboard/account/tokens
+export SUPABASE_URL=https://<ref>.supabase.co
+export STRIPE_SECRET_KEY=sk_test_...  # TEST key for the first pass
+
+# 1. rehearse — prints every request, sends nothing
+npm run golive -- --dry-run
+
+# 2. project + addon + secret group (DATABASE_URL linked) + service + build + wait for the URL
+npm run golive -- --phase=infra
+
+# 3. migrations: automatic on boot (RUN_MIGRATIONS_ON_BOOT=true in the secret group)
+
+# 4. Supabase redirect URLs, then the Stripe webhook (secret written back into the service)
+npm run golive -- --phase=supabase
+npm run golive -- --phase=stripe
+
+# 5. one real test-mode purchase, driven with pm_card_visa (= 4242 4242 4242 4242)
+npm run golive -- --phase=verify --url https://<your-domain> --email you@example.com --password '…'
+```
+
+`pm_card_visa` is Stripe's test payment method — the API equivalent of typing the 4242 card into
+Checkout — so a genuine `customer.subscription.created` event is delivered to your live webhook. The
+automation then polls `/commercial-api/entitlements` until `learnforge.family` appears, cancels the
+subscription and asserts the entitlement is gone. Real Stripe object, real signature, real database
+write, real revocation — only the browser is skipped.
+
+**Then flip to live:** set `STRIPE_SECRET_KEY=sk_live_…`, re-run `--phase=stripe`. Creating the live
+webhook endpoint returns a fresh signing secret, which the automation writes into the secret group and
+restarts the service for. Stripe's own guidance is to use a separate endpoint per mode, which is what
+this does — the test-mode endpoint keeps working for future rehearsals.
+
+### How the automation was verified here
+
+`npm run test:golive` — **9 checks, all passing** — runs `scripts/golive.mjs` against mock Northflank,
+Stripe and Supabase APIs served locally at their documented paths, while the application, the database
+and the webhook signature verification are real:
+
+```
+✓ --dry-run rehearses every phase without touching a provider API
+✓ pipeline issued the full resource graph (26 provider calls)
+✓ addon, secret group, service port, health check and Dockerfile payloads are correct
+✓ Stripe signing secret propagated to the service and the service was restarted
+✓ Supabase site_url and allowed redirect URLs point at the deployed origin
+✓ test-mode purchase granted the entitlement and cancellation revoked it
+✓ re-running the pipeline is idempotent (no duplicate resources)
+✓ existing webhook endpoint is adopted when its signing secret is supplied
+✓ provider secrets are redacted from all pipeline output
+
+GO-LIVE PIPELINE SUITE PASSED (9 checks)
+```
+
+Building it this way found **three real defects**, all fixed and now covered by assertions:
+
+| Defect | Symptom | Fix |
+| --- | --- | --- |
+| Logger called `console[stream]` | Any warning crashed the run with `TypeError: console[stream] is not a function` | Explicit `console.log`/`console.error` dispatch |
+| `--phase=<name>` was not parsed | The documented `--phase=verify` form silently ran *all* phases | Flag parser accepts `--name value` and `--name=value` |
+| `--phase=stripe` alone had no project context | Signing secret could not be written on a re-run | Read-only `resolveContext()` locates the project and secret group by name |
+
+A fourth issue was in the *test*, and worth recording because it validates the product: my mock reused
+fixed Stripe ids (`cus_mock_1`, `evt_created_sub_mock_1`) across runs, and the application correctly
+discarded the second run's event as a webhook replay — the `UNIQUE(provider, provider_event_id)`
+idempotency guard working exactly as designed. Run-unique ids (`RUN = Date.now().toString(36)`) fixed
+the mock, not the app.
+
+### Honest limits of this section
+
+- **The automation has never run against a real Northflank, Stripe or Supabase account.** Those APIs are
+  blocked from this environment. Endpoint paths, payload shapes and required fields come from the
+  official API references, and every request was exercised against a mock; a first live run can still
+  surface a version-specific field name (`typeSpecificSettings` vs `typeSpecificFields` on the addon is
+  the known candidate). `--dry-run` prints each request first, so nothing is a surprise, and every step
+  is an idempotent "ensure" — the worst case is re-running.
+- **`api.northflank.com/v1/swagger-json` is reachable from your machine** and settles that field name in
+  one command: `curl -s https://api.northflank.com/v1/swagger-json | grep -o 'typeSpecific[A-Za-z]*' | sort -u`.
+  If it prints `typeSpecificSettings`, the automation is already correct.
+- **The Docker image build** still compiles for the first time on Northflank's builder (no Docker daemon
+  here) — unchanged from §5.
+
+---
+
+## 7. Everything executed in this session
 
 | Work item | Result |
 | --- | --- |
@@ -218,17 +318,20 @@ in the service form; `/_runtime/health` answers either way.
 | New end-to-end purchase suite | 13/13 checks, plus the checkout-sync bug fixed |
 | Netlify publish-root exposure | 19 deny rules, 23 blocked / 8 served, CI-guarded |
 | `npm run preflight` | passes end-to-end including exposure probes |
-| Northflank IaC template + secrets template | JSON validated, all `${refs}`/`${args}` resolve |
+| Northflank IaC template + secrets template | JSON validated, all `${refs}`/`${args}` resolve; `RUN_MIGRATIONS_ON_BOOT=true` added |
+| Go-live automation (`scripts/golive.mjs` + 4 modules) | project → addon → secrets → service → build → Supabase → Stripe webhook → test purchase |
+| Go-live pipeline suite against mock provider APIs | **9/9 checks**, real app + real PostgreSQL + real HMAC |
 | CI | new real-PostgreSQL job; both jobs green on PR #2 |
-| Full suite | **62 assertions + 13 end-to-end checks**, `npm run check` clean |
-| Release artifact | `…_v17.2.zip`, 59 files, sha256 `9f314faf…97fb6c` |
+| Full suite | **62 assertions + 13 end-to-end checks + 9 pipeline checks**, `npm run check` clean |
+| Release artifact | `…_v17.2.zip`, 65 files, sha256 `906923fc…813e5` — now ships `scripts/golive*.mjs` and the pipeline suite |
 
 **Known gaps, stated plainly:**
 
 - The **Docker image build** was not executed (no Docker daemon here). The `Dockerfile`'s `COPY` sources
   were verified to exist, but Northflank's builder is the first place it truly compiles.
 - **No live Stripe or Supabase round trip** — impossible without your credentials; the local suite
-  simulates exactly those two boundaries.
+  simulates exactly those two boundaries. The go-live automation is what turns those boundary
+  simulations into real calls, on your machine, in the order you specified.
 - **No live hosting provider was contacted.** Northflank, Render, Fly and Oracle all require creating
   an account and a payment card; nothing in this environment can do that on your behalf.
 - `/commercial-api/health` returns **503** until `DATABASE_URL` is set *and* the migrations have run.
