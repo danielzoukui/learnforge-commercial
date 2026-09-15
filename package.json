@@ -1,0 +1,18 @@
+{
+  "name": "learnforge-commercial-netlify",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "netlify dev",
+    "check": "tsc --noEmit --module esnext --moduleResolution bundler --target es2022 --types node --skipLibCheck netlify/functions/*.mts netlify/functions/_shared/*.ts"
+  },
+  "dependencies": {
+    "@netlify/database": "latest",
+    "@netlify/functions": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/pg": "latest",
+    "typescript": "latest"
+  }
+}

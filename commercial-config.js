@@ -1,0 +1,15 @@
+(function(){
+  try{
+    localStorage.setItem('lf_prod_privacy_url','/privacy.html');
+    localStorage.setItem('lf_prod_terms_url','/terms.html');
+    localStorage.setItem('lf_prod_auth_url','/auth.html');
+  }catch(e){}
+  window.LearnForgeCommercialConfig={
+    authUrl:'/auth.html',
+    authSessionApi:'/commercial-api/auth/session',
+    accountApi:'/commercial-api/account',
+    entitlementApi:'/commercial-api/entitlements',
+    checkoutApi:'/commercial-api/checkout',
+    plans:['family','teacher']
+  };
+})();
