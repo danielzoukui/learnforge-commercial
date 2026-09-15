@@ -1,6 +1,6 @@
 # LearnForge Commercial — Deployment Execution Report
 
-**Executed:** 15 September 2026 · **Branch:** `arena/01a0a641-learnforge-commercial` · **Pull request:** [#2](https://github.com/danielzoukui/learnforge-commercial/pull/2) · **Head commit:** `@HEAD_COMMIT@`
+**Executed:** 15 September 2026 · **Branch:** `arena/01a0a641-learnforge-commercial` · **Pull request:** [#2](https://github.com/danielzoukui/learnforge-commercial/pull/2) · **Head commit:** `89b0c8a`
 
 **Distribution artifact:** `LearnForge_COMMERCIAL_MONETIZATION_COMPLETE_v17.2.zip` — 65 files, 2,343,151 bytes,
 SHA-256 `906923fc7a9d91ce6e540d3b1905ec1daa0de85061698192a4d4f1b9662813e5`
