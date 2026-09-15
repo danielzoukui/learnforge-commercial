@@ -78,6 +78,76 @@ export class StripeClient {
     return { id, secret, created: true };
   }
 
+  /**
+   * Reads a price and reports which mode it belongs to. Live-mode prices cannot be
+   * used with a test key (Stripe answers "No such price"), which is the reason the
+   * test purchase needs its own price ids.
+   */
+  async resolvePrice({ priceId }) {
+    const { data } = await this.http.get(`/prices/${encodeURIComponent(priceId)}`, {
+      synthetic: { livemode: this.live, unit_amount: 300, currency: "usd", product: "prod_dry_run" }
+    });
+    return data?.data || data;
+  }
+
+  /** Plan name for a price: the configured ids first, then Stripe metadata. */
+  async planForPrice({ priceId, familyPrice, teacherPrice }) {
+    if (priceId && familyPrice && priceId === familyPrice) return "family";
+    if (priceId && teacherPrice && priceId === teacherPrice) return "teacher";
+    // Plan resolution is best-effort: it must never fail the run, because the
+    // caller has a safe default.
+    let plan = null;
+    let productId = null;
+    try {
+      const price = await this.resolvePrice({ priceId });
+      plan = price?.metadata?.learnforge_plan || price?.metadata?.plan;
+      productId = typeof price?.product === "object" ? price?.product?.id : price?.product;
+    } catch (error) {
+      this.log?.info(`could not read price ${priceId} (${error?.status || error?.message || error})`);
+    }
+    if (!plan && productId) {
+      try {
+        const { data } = await this.http.get(`/products/${encodeURIComponent(productId)}`, { synthetic: { metadata: {} } });
+        const product = data?.data || data;
+        plan = product?.metadata?.learnforge_plan || product?.metadata?.plan;
+      } catch (error) {
+        this.log?.info(`could not read product ${productId} metadata (${error?.status || error?.message || error})`);
+      }
+    }
+    return plan ? String(plan).toLowerCase() : null;
+  }
+
+  /**
+   * Creates a test-mode product + price that mirrors the live one, tagged with
+   * `metadata.learnforge_plan` so the application's webhook maps it to the right
+   * entitlement. Used when a live price id meets a test-mode key.
+   */
+  async ensureTestPriceForPlan({ plan, unitAmount = 300, currency = "usd", label = null }) {
+    const name = label || `LearnForge ${plan.charAt(0).toUpperCase()}${plan.slice(1)} (test mode)`;
+    const product = await this.http.post("/products", {
+      form: {
+        name,
+        "metadata[learnforge_plan]": plan,
+        "metadata[learnforge_test_price]": "true"
+      },
+      synthetic: { id: "prod_dry_run", name }
+    });
+    const productId = pickId(product.data);
+    const price = await this.http.post("/prices", {
+      form: {
+        product: productId || "prod_dry_run",
+        currency,
+        unit_amount: String(unitAmount),
+        "recurring[interval]": "month",
+        "metadata[learnforge_plan]": plan
+      },
+      synthetic: { id: "price_dry_run", livemode: false }
+    });
+    const priceId = pickId(price.data);
+    this.log?.ok(`created test-mode price ${priceId} for plan "${plan}" (${(unitAmount / 100).toFixed(2)} ${currency.toUpperCase()}/month)`);
+    return { priceId, productId };
+  }
+
   async createTestCustomer({ email }) {
     const { data } = await this.http.post("/customers", {
       form: {
@@ -99,6 +169,7 @@ export class StripeClient {
       "items[0][price]": priceId,
       "metadata[learnforge_auth_user_id]": authUserId,
       "metadata[learnforge_plan]": plan,
+      "metadata[plan]": plan,
       "expand[0]": "latest_invoice"
     };
     if (trial) form["trial_period_days"] = "14";

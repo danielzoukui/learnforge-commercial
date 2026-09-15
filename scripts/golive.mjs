@@ -66,6 +66,7 @@ const config = {
   branch: String(flag("branch", process.env.LEARNFORGE_BRANCH || "main")),
   email: flag("email", process.env.TEST_PURCHASE_EMAIL),
   webhookSecret: flag("webhook-secret", process.env.STRIPE_WEBHOOK_SECRET || null),
+  createTestPrice: !process.argv.includes("--no-create-test-price"),
   password: flag("password", process.env.TEST_PURCHASE_PASSWORD),
   migrationsOnBoot: String(process.env.GOLIVE_RUN_MIGRATIONS_ON_BOOT || "true") !== "false",
   northflankToken: process.env.NORTHFLANK_API_TOKEN,
@@ -79,6 +80,7 @@ const config = {
 };
 
 const results = { phases: {}, created: [], warnings: [] };
+let context = null;
 const needs = (condition, phaseName, message) => {
   if (condition) return true;
   log.fail(`[${phaseName}] ${message}`);
@@ -152,18 +154,34 @@ async function phaseSupabase() {
   results.phases.supabase = "ok";
 }
 
+/**
+ * Locates the project, secret group and service by name so partial runs
+ * (`--phase=stripe`, `--phase=verify`) can still write secrets without
+ * re-creating infrastructure. Never creates anything, and caches its result.
+ */
+async function ensureContext() {
+  if (context) return context;
+  if (results.northflank?.projectId && results.northflank?.secretId) {
+    context = { ...results.northflank };
+    return context;
+  }
+  if (!config.northflankToken) return { projectId: null, secretId: null, serviceId: null };
+  const client = new NorthflankClient({ token: config.northflankToken, baseUrl: bases.northflank, dryRun, log });
+  const { projectId, secretId } = await client.resolveContext({ projectName: config.project, secretName: "learnforge-secrets" });
+  let serviceId = null;
+  if (projectId) {
+    serviceId = (await client.listServices(projectId)).find((service) => service.name === "learnforge")?.id || null;
+  }
+  context = { projectId, secretId, serviceId };
+  return context;
+}
+
 async function phaseStripe() {
   log.phase("③ Stripe webhook endpoint");
   if (!needs(config.stripeKey, "stripe", "STRIPE_SECRET_KEY is not set (use sk_test_… for the first pass)")) return;
   if (!needs(config.siteUrl, "stripe", "no site URL yet — pass --url https://your-domain")) return;
 
-  // When only this phase runs, locate the project and secret group by name so the
-  // signing secret can still be written without re-creating infrastructure.
-  let { projectId, secretId } = results.northflank || {};
-  if ((!projectId || !secretId) && config.northflankToken) {
-    const resolver = new NorthflankClient({ token: config.northflankToken, baseUrl: bases.northflank, dryRun, log });
-    ({ projectId, secretId } = await resolver.resolveContext({ projectName: config.project, secretName: "learnforge-secrets" }));
-  }
+  const { projectId, secretId } = await ensureContext();
 
   const stripe = new StripeClient({ secretKey: config.stripeKey, baseUrl: bases.stripe, dryRun, log });
   const webhookUrl = `${config.siteUrl}/commercial-api/stripe-webhook`;
@@ -173,8 +191,7 @@ async function phaseStripe() {
   if (secret && projectId && secretId && config.northflankToken) {
     const client = new NorthflankClient({ token: config.northflankToken, baseUrl: bases.northflank, dryRun, log });
     await client.syncSecretVariables({ projectId, secretId, variables: { STRIPE_WEBHOOK_SECRET: secret } });
-    const serviceId = results.northflank?.serviceId
-      || (await client.listServices(projectId)).find((service) => service.name === "learnforge")?.id;
+    const { serviceId } = await ensureContext();
     if (serviceId) await client.restartService({ projectId, serviceId });
     results.created.push("STRIPE_WEBHOOK_SECRET written to the secret group");
   } else if (secret) {
@@ -237,13 +254,54 @@ async function phaseVerify() {
     log.warn("test purchase needs STRIPE_SECRET_KEY and STRIPE_PRICE_FAMILY");
   } else {
     const stripe = new StripeClient({ secretKey: config.stripeKey, baseUrl: bases.stripe, dryRun, log });
+    let priceId = config.stripePriceFamily;
+
+    if (stripe.live) {
+      results.phases.verify = "failed";
+      log.fail("STRIPE_SECRET_KEY is a LIVE key — refusing to run a test purchase.");
+      log.fail("Stripe rejects test payment methods live, and a live charge is not a rehearsal.");
+      log.fail("Re-run with an sk_test_… key (the live key belongs on the service, not in this shell).");
+      results.warnings.push("Test purchase skipped: use sk_test_… for the rehearsal, then flip the service to live keys.");
+      return;
+    }
+
+    // Stripe keeps test and live data separate: a live price id cannot be used with
+    // a test key (it answers "No such price"). Reconcile the two before paying.
+    const price = await stripe.resolvePrice({ priceId });
+    if (price?.livemode) {
+      log.warn(`STRIPE_PRICE_FAMILY (${priceId}) is a LIVE price and this key is TEST mode.`);
+      if (!config.createTestPrice) {
+        results.phases.verify = "failed";
+        log.fail("Create the matching price in test mode, or drop --no-create-test-price to create it automatically:");
+        log.fail(`    curl https://api.stripe.com/v1/prices -u "${config.stripeKey}:\${STRIPE_SECRET_KEY}" -d product=prod_… -d currency=usd -d unit_amount=300 -d recurring[interval]=month`);
+        return;
+      }
+      const created = await stripe.ensureTestPriceForPlan({ plan: "family", unitAmount: price.unit_amount ?? 300, currency: price.currency ?? "usd" });
+      priceId = created.priceId;
+      // Keep the deployment's checkout working in test mode too, by pointing the
+      // service at the test price for the duration of the rehearsal.
+      const { projectId, secretId, serviceId } = await ensureContext();
+      if (projectId && secretId && config.northflankToken) {
+        const client = new NorthflankClient({ token: config.northflankToken, baseUrl: bases.northflank, dryRun, log });
+        await client.syncSecretVariables({ projectId, secretId, variables: { STRIPE_PRICE_FAMILY: priceId } });
+        if (serviceId) await client.restartService({ projectId, serviceId });
+      } else {
+        log.warn(`set STRIPE_PRICE_FAMILY=${priceId} on the service so the browser checkout also works in test mode`);
+      }
+    }
+
+    const plan = (await stripe.planForPrice({ priceId, familyPrice: config.stripePriceFamily, teacherPrice: config.stripePriceTeacher })) || "family";
+    log.info(`test purchase will use price ${priceId} → plan "${plan}"`);
+
     const run = await stripe.runTestPurchase({
       siteUrl: config.siteUrl,
-      priceId: config.stripePriceFamily,
+      priceId,
+      plan,
       email: String(config.email),
       password: String(config.password)
     });
     log.ok(`test purchase granted ${run.entitlements.entitlements.map((entry) => entry.entitlement_key).join(", ")}`);
+    log.info("when you flip the service to live keys, restore STRIPE_PRICE_FAMILY (and STRIPE_PRICE_TEACHER) to the live price ids");
 
     log.info("cancelling the test subscription to prove revocation…");
     await stripe.cancelSubscription({ subscriptionId: run.subscriptionId });

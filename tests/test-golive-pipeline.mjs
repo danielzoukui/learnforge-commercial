@@ -89,6 +89,8 @@ async function startMockProviders({ siteUrl }) {
     services: [],
     subscriptions: new Map(),
     webhookEndpoints: [],
+    createdPrices: [],
+    products: [],
     supabaseAuth: { site_url: null, uri_allow_list: "" },
     webhookSecret: WEBHOOK_SECRET
   };
@@ -192,6 +194,33 @@ async function startMockProviders({ siteUrl }) {
       return json(res, 200, { ...endpoint, secret: WEBHOOK_SECRET });
     }
     if (p.startsWith("/v1/webhook_endpoints/") && req.method === "POST") return json(res, 200, { id: p.split("/").pop() });
+    if (p.startsWith("/v1/prices/") && req.method === "GET") {
+      const id = p.split("/").pop();
+      // Any price named *live* belongs to live mode, mirroring the ids baked into
+      // the repository's documentation; everything else is a test-mode price.
+      return json(res, 200, { id, livemode: id.toLowerCase().includes("live"), unit_amount: 300, currency: "usd", product: "prod_mock_live", metadata: {} });
+    }
+    if (p === "/v1/products" && req.method === "POST") {
+      const product = { id: `prod_test_${RUN}`, name: body.name, metadata: body["metadata[learnforge_plan]"] ? { learnforge_plan: body["metadata[learnforge_plan]"] } : {} };
+      state.products.push(product);
+      return json(res, 200, product);
+    }
+    if (p === "/v1/prices" && req.method === "POST") {
+      state.createdPrices.push(body);
+      return json(res, 200, {
+        id: `price_test_${RUN}`,
+        livemode: false,
+        unit_amount: Number(body.unit_amount),
+        currency: body.currency,
+        product: body.product,
+        metadata: body["metadata[learnforge_plan]"] ? { learnforge_plan: body["metadata[learnforge_plan]"] } : {}
+      });
+    }
+    if (p.startsWith("/v1/products/") && req.method === "GET") {
+      const id = p.split("/").pop();
+      const product = state.products.find((entry) => entry.id === id) || { id, metadata: {} };
+      return json(res, 200, product);
+    }
     if (p === "/v1/customers" && req.method === "POST") {
       return json(res, 200, { id: `cus_mock_${RUN}`, email: body.email });
     }
@@ -405,7 +434,38 @@ async function main() {
     assert.ok(!stripeWithSecret.output.includes(WEBHOOK_SECRET), "the supplied secret must stay redacted");
     ok("existing webhook endpoint is adopted when its signing secret is supplied");
 
-    // 9. Secrets are never printed in clear text.
+    // 9. A live price id with a test key: Stripe keeps the two modes separate, so
+    //    the automation creates a matching test price, tags the plan, points the
+    //    deployment at it, and still completes the purchase.
+    const beforePriceCalls = providers.state.createdPrices.length;
+    const livePrice = await runGolive(["--phase=verify", "--quiet"], {
+      ...goliveEnv,
+      SITE_URL: appUrl,
+      STRIPE_PRICE_FAMILY: "price_LIVE_family"
+    });
+    assert.equal(livePrice.code, 0, `verify should handle the live/test price split:\n${livePrice.output}`);
+    assert.match(livePrice.output, /is a LIVE price and this key is TEST mode/);
+    assert.equal(providers.state.createdPrices.length, beforePriceCalls + 1, "a test-mode price should have been created");
+    const createdPrice = providers.state.createdPrices.at(-1);
+    assert.equal(createdPrice["recurring[interval]"], "month");
+    assert.equal(createdPrice["metadata[learnforge_plan]"], "family");
+    const repointed = providers.state.calls.filter((call) => call.method === "PATCH" && call.path.includes("/secrets/")).at(-1);
+    assert.match(repointed.body.secrets.variables.STRIPE_PRICE_FAMILY, new RegExp(`price_test_${RUN}`), "the deployment should be repointed at the test price");
+    assert.match(livePrice.output, /test purchase granted learnforge\.family/);
+    ok("live price + test key: creates a plan-tagged test price, repoints the deployment, purchase still passes");
+
+    // 10. A live key is refused outright rather than charged.
+    const liveKey = await runGolive(["--phase=verify", "--quiet"], {
+      ...goliveEnv,
+      SITE_URL: appUrl,
+      STRIPE_SECRET_KEY: "sk_live_not_a_rehearsal",
+      STRIPE_PRICE_FAMILY: "price_LIVE_family"
+    });
+    assert.equal(liveKey.code, 1, "a live key must not run a test purchase");
+    assert.match(liveKey.output, /refusing to run a test purchase/);
+    ok("live key is refused before any charge is attempted");
+
+    // 11. Secrets are never printed in clear text.
     assert.ok(!run.output.includes(WEBHOOK_SECRET), "the webhook secret must not appear in logs");
     assert.ok(!run.output.includes("sk_test_mock"), "the Stripe key must not appear in logs");
     ok("provider secrets are redacted from all pipeline output");

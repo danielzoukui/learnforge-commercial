@@ -157,6 +157,16 @@ before the purchase, and `--quiet` reduces output to outcomes only.
 
 ### The test purchase
 
+> **Price ids are mode-specific.** Strictly speaking, Stripe keeps test and live data
+> in separate universes: the price ids baked into this repository
+> (`price_1UEz7K…` Family, `price_1UEz7Q…` Teacher) are **live-mode** prices and a
+> test key cannot use them — Stripe answers `No such price`. The automation detects
+> this, creates a matching test-mode product + price tagged
+> `metadata.learnforge_plan`, repoints `STRIPE_PRICE_FAMILY` at it, and only then
+> pays. When you flip the service to live keys, set the price variables back to the
+> live ids (or delete the test price and re-run). Pass `--no-create-test-price` to
+> have it stop and tell you the exact `curl` instead of creating anything.
+
 `--email/--password` (or `TEST_PURCHASE_EMAIL`/`TEST_PURCHASE_PASSWORD`) point at an
 account on the deployment. The automation creates the account if needed, then drives
 Stripe's API with `pm_card_visa` — the API equivalent of typing
@@ -229,6 +239,8 @@ real:
 | Re-running is safe | second run creates no duplicate resources and reports `already exists` |
 | `--dry-run` sends nothing | zero provider calls, zero side effects |
 | Secrets never reach the logs | `sk_…`, `whsec_…` redacted from all output |
+| Live price + test key is handled, not fatal | a plan-tagged test price is created, the deployment is repointed, the purchase still passes |
+| A live key can never run the rehearsal | `--phase=verify` refuses before any charge is attempted |
 
 Not verifiable without your accounts: the Docker image build on Northflank's builder,
 and a live Stripe/Supabase round trip. Both are steps 3–4 above.

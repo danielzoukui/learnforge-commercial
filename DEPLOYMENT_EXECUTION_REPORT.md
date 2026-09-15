@@ -2,8 +2,8 @@
 
 **Executed:** 15 September 2026 · **Branch:** `arena/01a0a641-learnforge-commercial` · **Pull request:** [#2](https://github.com/danielzoukui/learnforge-commercial/pull/2) · **Head commit:** `89b0c8a`
 
-**Distribution artifact:** `LearnForge_COMMERCIAL_MONETIZATION_COMPLETE_v17.2.zip` — 65 files, 2,343,151 bytes,
-SHA-256 `906923fc7a9d91ce6e540d3b1905ec1daa0de85061698192a4d4f1b9662813e5`
+**Distribution artifact:** `LearnForge_COMMERCIAL_MONETIZATION_COMPLETE_v17.2.zip` — 65 files, 2,346,131 bytes,
+SHA-256 `7d4c3ca3947fa3e3d350c521acb5e6e3038b746ce252b580b96ded3fe0b25d57`
 (this report is intentionally *not* inside the archive, so the hash stays stable).
 
 ---
@@ -261,7 +261,7 @@ this does — the test-mode endpoint keeps working for future rehearsals.
 
 ### How the automation was verified here
 
-`npm run test:golive` — **9 checks, all passing** — runs `scripts/golive.mjs` against mock Northflank,
+`npm run test:golive` — **11 checks, all passing** — runs `scripts/golive.mjs` against mock Northflank,
 Stripe and Supabase APIs served locally at their documented paths, while the application, the database
 and the webhook signature verification are real:
 
@@ -275,9 +275,21 @@ and the webhook signature verification are real:
 ✓ re-running the pipeline is idempotent (no duplicate resources)
 ✓ existing webhook endpoint is adopted when its signing secret is supplied
 ✓ provider secrets are redacted from all pipeline output
+✓ live price + test key: creates a plan-tagged test price, repoints the deployment, purchase still passes
+✓ live key is refused before any charge is attempted
 
-GO-LIVE PIPELINE SUITE PASSED (9 checks)
+GO-LIVE PIPELINE SUITE PASSED (11 checks)
 ```
+
+One thing worth knowing before your first run, from reading the application's own mapping
+(`commercial-stripe-webhook.mts` grants entitlements from `metadata.learnforge_plan`):
+**the price ids in this repository are live-mode prices, and a test key cannot use them** —
+Stripe answers `No such price`, because Stripe keeps test and live data in separate
+universes. The automation now detects that, creates a matching test-mode product + price
+tagged `metadata.learnforge_plan`, repoints `STRIPE_PRICE_FAMILY` at it, and then pays
+(`--no-create-test-price` stops and prints the equivalent `curl` instead). It also refuses
+outright to run the rehearsal with an `sk_live_` key, so a live charge can never come out
+of a rehearsal. Both behaviours have their own checks.
 
 Building it this way found **three real defects**, all fixed and now covered by assertions:
 
@@ -320,10 +332,10 @@ the mock, not the app.
 | `npm run preflight` | passes end-to-end including exposure probes |
 | Northflank IaC template + secrets template | JSON validated, all `${refs}`/`${args}` resolve; `RUN_MIGRATIONS_ON_BOOT=true` added |
 | Go-live automation (`scripts/golive.mjs` + 4 modules) | project → addon → secrets → service → build → Supabase → Stripe webhook → test purchase |
-| Go-live pipeline suite against mock provider APIs | **9/9 checks**, real app + real PostgreSQL + real HMAC |
+| Go-live pipeline suite against mock provider APIs | **11/11 checks**, real app + real PostgreSQL + real HMAC |
 | CI | new real-PostgreSQL job; both jobs green on PR #2 |
-| Full suite | **62 assertions + 13 end-to-end checks + 9 pipeline checks**, `npm run check` clean |
-| Release artifact | `…_v17.2.zip`, 65 files, sha256 `906923fc…813e5` — now ships `scripts/golive*.mjs` and the pipeline suite |
+| Full suite | **62 assertions + 13 end-to-end checks + 11 pipeline checks**, `npm run check` clean |
+| Release artifact | `…_v17.2.zip`, 65 files, sha256 `7d4c3ca3…b25d57` — now ships `scripts/golive*.mjs` and the pipeline suite |
 
 **Known gaps, stated plainly:**
 
