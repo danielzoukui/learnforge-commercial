@@ -155,6 +155,8 @@ npm run golive
 
 | Document | Contents |
 | --- | --- |
+| [`GOLIVE_HANDBOOK.md`](GOLIVE_HANDBOOK.md) | **Start here to go live**: account setup, credential check, deploy, verify, flip to live |
+| --- | --- |
 | [`HOSTING_OPTIONS.md`](HOSTING_OPTIONS.md) | Verified free-tier comparison (Sept 2026), corrections to earlier advice, and the recommended production path |
 | [`deploy/PORTABLE_RUNTIME.md`](deploy/PORTABLE_RUNTIME.md) | How the portability layer works, env-var mapping, parity notes, endpoint list |
 | [`deploy/NORTHFLANK.md`](deploy/NORTHFLANK.md) | Recommended: free, always-on service + PostgreSQL addon (one-click [IaC template](deploy/northflank.json)) |

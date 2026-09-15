@@ -194,6 +194,10 @@ async function startMockProviders({ siteUrl }) {
       return json(res, 200, { ...endpoint, secret: WEBHOOK_SECRET });
     }
     if (p.startsWith("/v1/webhook_endpoints/") && req.method === "POST") return json(res, 200, { id: p.split("/").pop() });
+    if (p === "/v1/balance" && req.method === "GET") return json(res, 200, { livemode: false, available: [] });
+    if (p === "/v1/account" && req.method === "GET") return json(res, 200, { id: "acct_mock", country: "US", email: EMAIL });
+    if (p === "/v1/teams" && req.method === "GET") return json(res, 200, [{ id: "team_mock", name: "LearnForge Sandbox" }]);
+    if (p === "/v1/projects/mockref" && req.method === "GET") return json(res, 200, { id: "mockref", name: "learnforge-supabase", region: "us-east-1", status: "ACTIVE_HEALTHY" });
     if (p.startsWith("/v1/prices/") && req.method === "GET") {
       const id = p.split("/").pop();
       // Any price named *live* belongs to live mode, mirroring the ids baked into
@@ -293,6 +297,20 @@ async function startApp({ databaseUrl, supabaseUrl, port }) {
   }
   child.kill("SIGKILL");
   throw new Error(`app did not start:\n${output}`);
+}
+
+function runBootstrap(env) {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [path.join(rootDir, "scripts", "golive", "bootstrap.mjs")], {
+      cwd: rootDir,
+      env: { ...process.env, ...env },
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    let output = "";
+    child.stdout.on("data", (chunk) => { output += chunk.toString(); });
+    child.stderr.on("data", (chunk) => { output += chunk.toString(); });
+    child.on("exit", (code) => resolve({ code, output }));
+  });
 }
 
 function runGolive(args, env) {
@@ -465,7 +483,72 @@ async function main() {
     assert.match(liveKey.output, /refusing to run a test purchase/);
     ok("live key is refused before any charge is attempted");
 
-    // 11. Secrets are never printed in clear text.
+    // 11. The readiness checker validates real credentials end to end.
+    const cleanEnv = { ...process.env };
+    for (const key of ["NORTHFLANK_API_TOKEN", "STRIPE_SECRET_KEY", "SUPABASE_ACCESS_TOKEN", "SUPABASE_URL", "STRIPE_PRICE_FAMILY", "STRIPE_PRICE_TEACHER", "SITE_URL", "PUBLIC_SITE_URL"]) {
+      delete cleanEnv[key];
+    }
+
+    // Credentials absent but the APIs answer → exit 1, one line per missing piece.
+    const bare = await runBootstrap({
+      ...cleanEnv,
+      NORTHFLANK_API_BASE: `${providers.url}/v1`,
+      STRIPE_API_BASE: `${providers.url}/v1`,
+      SUPABASE_API_BASE: `${providers.url}/v1`
+    });
+    assert.equal(bare.code, 1, `the checker should fail when credentials are absent:\n${bare.output}`);
+    for (const expected of ["NORTHFLANK_API_TOKEN is not set", "STRIPE_SECRET_KEY is not set", "SUPABASE_URL is not set"]) {
+      assert.ok(bare.output.includes(expected), `expected the checker to report: ${expected}\n${bare.output}`);
+    }
+    assert.ok(bare.output.includes("↳"), "every failure should carry a fix instruction");
+    ok("readiness checker names every missing credential with a fix instruction");
+
+    // APIs unreachable (this sandbox, a corporate proxy) → exit 2, distinct from a
+    // credential mistake, with the reason stated plainly.
+    const offline = await runBootstrap({ ...cleanEnv, NORTHFLANK_API_BASE: "http://127.0.0.1:9/v1" });
+    assert.equal(offline.code, 2, `unreachable APIs should exit 2:\n${offline.output}`);
+    assert.match(offline.output, /unreachable/);
+    assert.match(offline.output, /Run this on your own machine/);
+    ok("unreachable provider APIs exit 2 with the reason stated (not confused with a bad token)");
+
+    const ready = await runBootstrap({
+      ...cleanEnv,
+      NORTHFLANK_API_TOKEN: "nfp_test_token",
+      NORTHFLANK_API_BASE: `${providers.url}/v1`,
+      STRIPE_API_BASE: `${providers.url}/v1`,
+      SUPABASE_API_BASE: `${providers.url}/v1`,
+      STRIPE_SECRET_KEY: "sk_test_mock",
+      STRIPE_PRICE_FAMILY: "price_test_family",
+      STRIPE_PRICE_TEACHER: "price_test_teacher",
+      SUPABASE_ACCESS_TOKEN: "sbp_test_token",
+      SUPABASE_URL: "https://mockref.supabase.co"
+    });
+    assert.equal(ready.code, 0, `the checker should pass with working credentials:\n${ready.output}`);
+    for (const expected of ["Token accepted", "test mode", "Management token accepted", "exists"]) {
+      assert.ok(ready.output.includes(expected), `expected the checker to confirm: ${expected}\n${ready.output}`);
+    }
+    assert.match(ready.output, /Teams visible to this token: LearnForge Sandbox/);
+    assert.ok(ready.output.includes("npm run golive"), "a passing check should print the next command");
+    ok("readiness checker passes with working credentials and prints the next command");
+
+    // A live price with a test key is called out before the run gets that far.
+    const livePriceCheck = await runBootstrap({
+      ...cleanEnv,
+      NORTHFLANK_API_TOKEN: "nfp_test_token",
+      NORTHFLANK_API_BASE: `${providers.url}/v1`,
+      STRIPE_API_BASE: `${providers.url}/v1`,
+      SUPABASE_API_BASE: `${providers.url}/v1`,
+      STRIPE_SECRET_KEY: "sk_test_mock",
+      STRIPE_PRICE_FAMILY: "price_LIVE_family",
+      STRIPE_PRICE_TEACHER: "price_LIVE_teacher",
+      SUPABASE_ACCESS_TOKEN: "sbp_test_token",
+      SUPABASE_URL: "https://mockref.supabase.co"
+    });
+    assert.equal(livePriceCheck.code, 0, `mode reporting should not be a failure:\n${livePriceCheck.output}`);
+    assert.match(livePriceCheck.output, /LIVE price/);
+    ok("readiness checker reports the mode of each configured price");
+
+    // 12. Secrets are never printed in clear text.
     assert.ok(!run.output.includes(WEBHOOK_SECRET), "the webhook secret must not appear in logs");
     assert.ok(!run.output.includes("sk_test_mock"), "the Stripe key must not appear in logs");
     ok("provider secrets are redacted from all pipeline output");

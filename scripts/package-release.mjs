@@ -31,6 +31,7 @@ const includes = [
   "README.md",
   "COMMERCIALIZATION_README.md",
   "HOSTING_OPTIONS.md",
+  "GOLIVE_HANDBOOK.md",
   ".gitignore",
   ".github",
   "netlify",

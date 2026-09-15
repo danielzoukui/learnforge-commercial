@@ -13,6 +13,7 @@
     "migrate:status": "node runtime/migrate.mjs --status",
     "preflight": "node scripts/preflight-deploy.mjs",
     "golive": "node scripts/golive.mjs",
+    "golive:check": "node scripts/golive/bootstrap.mjs",
     "package": "node scripts/package-release.mjs",
     "check": "tsc --noEmit --module esnext --moduleResolution bundler --target es2022 --types node --skipLibCheck netlify/functions/*.mts netlify/functions/_shared/*.ts",
     "test": "node tests/test-commercial.mjs && node tests/test-webhook-signatures.mjs && node tests/test-netlify-exposure.mjs && node tests/test-portable-runtime.mjs && node tests/test-end-to-end-purchase.mjs && node tests/test-golive-pipeline.mjs",
