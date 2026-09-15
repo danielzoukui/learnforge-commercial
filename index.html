@@ -28814,6 +28814,42 @@ if(!seen){
   localStorage.setItem('lf_release_seen',VERSION);
   setTimeout(()=>toast('Welcome to LearnForge '+VERSION+' — commercial release candidate'),700);
 }
+
+// Commercial entitlement check
+async function checkCommercialEntitlement(){
+  try{
+    const r=await fetch('/commercial-api/entitlements',{credentials:'same-origin'});
+    if(!r.ok)return;
+    const d=await r.json();
+    if(d?.subscription&&(d.subscription.status==='active'||d.subscription.status==='trialing')){
+      localStorage.setItem('lf_commercial_plan',d.subscription.plan);
+      const badge=document.querySelector('#lf-plan-pill');
+      if(badge)badge.textContent=d.subscription.plan==='teacher'?'Teacher Plan':'Family Plan';
+    }else{
+      localStorage.removeItem('lf_commercial_plan');
+    }
+  }catch(e){}
+}
+setTimeout(checkCommercialEntitlement,1500);
+
+// Commercial settings & navigation observer
+function attachCommercialNav(){
+  if(location.hash==='#/settings'){
+    const card=document.querySelector('#app .card');
+    if(card&&!document.querySelector('#lf-commercial-settings-box')){
+      const box=document.createElement('div');
+      box.id='lf-commercial-settings-box';
+      const plan=localStorage.getItem('lf_commercial_plan');
+      const planLabel=plan==='teacher'?'Teacher Plan (Active)':plan==='family'?'Family Plan (Active)':'Free Edition';
+      box.innerHTML='<hr style="border:0;border-top:1px solid var(--line);margin:18px 0"><h3 style="margin:0 0 6px">⭐️ LearnForge Membership & Billing</h3><div class="small muted" style="margin-bottom:10px">Current subscription: <strong>'+planLabel+'</strong></div><div class="row wrap" style="gap:8px"><a class="btn primary" href="/pricing.html" style="text-decoration:none;display:inline-block;padding:8px 14px;border-radius:10px;font-size:0.9rem">Manage Plans & Billing</a><a class="btn ghost" href="/support.html" style="text-decoration:none;display:inline-block;padding:8px 14px;border-radius:10px;font-size:0.9rem">Support</a></div>';
+      const logoutRow=card.querySelector('#settings-logout')?.closest('.row');
+      if(logoutRow)card.insertBefore(box,logoutRow);
+      else card.appendChild(box);
+    }
+  }
+}
+window.addEventListener('hashchange',()=>setTimeout(attachCommercialNav,100));
+new MutationObserver(()=>setTimeout(attachCommercialNav,50)).observe(document.body,{childList:true,subtree:true});
 })();
 </script>
 
@@ -28822,11 +28858,13 @@ if(!seen){
 function addFooter(){
   const app=document.querySelector('#app');if(!app||document.querySelector('#lf-commercial-footer-ui'))return;
   const f=document.createElement('footer');f.id='lf-commercial-footer-ui';f.className='small muted';f.style.cssText='max-width:1200px;margin:28px auto 16px;padding:16px;text-align:center;border-top:1px solid var(--line)';
-  const privacy=localStorage.getItem('lf_prod_privacy_url'),terms=localStorage.getItem('lf_prod_terms_url'),support=localStorage.getItem('lf_prod_support');
-  let links='<a href="#/privacy">Privacy & Data</a>';
+  const pricing=localStorage.getItem('lf_prod_pricing_url')||'/pricing.html';
+  const authUrl=localStorage.getItem('lf_prod_auth_url')||'/auth.html';
+  const privacy=localStorage.getItem('lf_prod_privacy_url'),terms=localStorage.getItem('lf_prod_terms_url'),support=localStorage.getItem('lf_prod_support')||'/support.html';
+  let links='<a href="'+pricing+'">Plans & Pricing</a> · <a href="'+authUrl+'">Account</a> · <a href="#/privacy">Privacy & Data</a>';
   if(privacy)links+=' · <a target="_blank" rel="noopener" href="'+privacy.replace(/"/g,'')+'">Privacy Policy</a>';
   if(terms)links+=' · <a target="_blank" rel="noopener" href="'+terms.replace(/"/g,'')+'">Terms</a>';
-  if(support)links+=' · <span>Support: '+support.replace(/[<>]/g,'')+'</span>';
+  if(support)links+=' · <a href="'+(support.startsWith('http')||support.startsWith('/')?support:'/support.html')+'">Support</a>';
   f.innerHTML='LearnForge 17.0 RC · '+links;
   app.parentNode.insertBefore(f,app.nextSibling);
 }

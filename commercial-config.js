@@ -3,13 +3,18 @@
     localStorage.setItem('lf_prod_privacy_url','/privacy.html');
     localStorage.setItem('lf_prod_terms_url','/terms.html');
     localStorage.setItem('lf_prod_auth_url','/auth.html');
+    localStorage.setItem('lf_prod_pricing_url','/pricing.html');
+    localStorage.setItem('lf_prod_support','/support.html');
   }catch(e){}
   window.LearnForgeCommercialConfig={
     authUrl:'/auth.html',
+    pricingUrl:'/pricing.html',
     authSessionApi:'/commercial-api/auth/session',
     accountApi:'/commercial-api/account',
     entitlementApi:'/commercial-api/entitlements',
     checkoutApi:'/commercial-api/checkout',
+    checkoutSyncApi:'/commercial-api/checkout-sync',
+    portalApi:'/commercial-api/portal',
     plans:['family','teacher']
   };
 })();

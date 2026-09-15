@@ -1,4 +1,5 @@
 import type { Context, Config } from "@netlify/functions";
+import { getDatabase } from "@netlify/database";
 import { verifyCommercialUser } from "./_shared/commercial-auth";
 
 const priceEnv: Record<string, string> = {
@@ -11,8 +12,15 @@ export default async (req: Request, _context: Context) => {
   const secret = Netlify.env.get("STRIPE_SECRET_KEY");
   const siteUrl = Netlify.env.get("PUBLIC_SITE_URL") || new URL(req.url).origin;
   if (!secret) return Response.json({ error: "Billing is not configured yet" }, { status: 503 });
+
   let user;
-  try { user = await verifyCommercialUser(req); } catch (e) { if (e instanceof Response) return e; throw e; }
+  try {
+    user = await verifyCommercialUser(req);
+  } catch (e) {
+    if (e instanceof Response) return e;
+    throw e;
+  }
+
   const body = await req.json().catch(() => ({}));
   const plan = String(body.plan || "").toLowerCase();
   const email = user.email;
@@ -20,9 +28,29 @@ export default async (req: Request, _context: Context) => {
   const price = envName ? Netlify.env.get(envName) : null;
   if (!price) return Response.json({ error: "That plan is not configured yet" }, { status: 400 });
 
+  let existingCustomerId: string | null = null;
+  try {
+    const db = getDatabase();
+    const rows = await db.sql`
+      SELECT cs.provider_customer_id
+      FROM commercial_subscriptions cs
+      JOIN commercial_accounts ca ON cs.account_id = ca.id
+      WHERE ca.auth_user_id = ${user.id} AND cs.provider = 'stripe' AND cs.provider_customer_id IS NOT NULL
+      ORDER BY cs.updated_at DESC LIMIT 1
+    `;
+    if (rows.length && rows[0].provider_customer_id) {
+      existingCustomerId = String(rows[0].provider_customer_id);
+    }
+  } catch {}
+
   const form = new URLSearchParams();
   form.set("mode", "subscription");
-  form.set("customer_email", email);
+  if (existingCustomerId) {
+    form.set("customer", existingCustomerId);
+  } else {
+    form.set("customer_email", email);
+  }
+  form.set("client_reference_id", user.id);
   form.set("line_items[0][price]", price);
   form.set("line_items[0][quantity]", "1");
   form.set("success_url", `${siteUrl}/pricing.html?checkout=success&session_id={CHECKOUT_SESSION_ID}`);

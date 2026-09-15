@@ -3,14 +3,24 @@
 This package keeps the current LearnForge single-file deployment as the product front end and adds a Netlify-native commercial backend scaffold.
 
 ## Included
-- Existing working `index.html` with the learning engine preserved.
-- Netlify security/cache headers.
-- Netlify Database migration for commercial accounts, subscriptions, entitlements, and audit events.
-- `/commercial-api/health`
-- `/commercial-api/account`
-- `/commercial-api/entitlements`
-- `/commercial-api/checkout`
-- Pricing, Privacy, Terms, and Support pages.
+- Existing working `index.html` with the 23,400+ skill learning engine preserved.
+- Netlify security and cache headers (`netlify.toml`).
+- Netlify Database migrations for commercial accounts, subscriptions, entitlements, webhook idempotency, and audit events.
+- Commercial API routes:
+  - `/commercial-api/health` — Database and service health check
+  - `/commercial-api/account` — Authenticated commercial account sync
+  - `/commercial-api/entitlements` — Real-time entitlement and active subscription query
+  - `/commercial-api/checkout` — Authenticated Stripe Checkout session creation
+  - `/commercial-api/checkout-sync` — Immediate post-checkout session verification and entitlement sync
+  - `/commercial-api/portal` — Self-service Stripe Billing Customer Portal (invoices, card updates, plan changes, cancellation)
+  - `/commercial-api/stripe-webhook` — Cryptographically verified webhook synchronization with idempotency tracking
+  - `/commercial-api/auth/*` — Hosted session proxy (signup, signin, signout, refresh, recover, update-password, adopt-session)
+- Front-end pages:
+  - `pricing.html` — Full commercial tier comparison (Family $3/mo, Teacher $5/mo, School enterprise), active subscription recognition, portal launch, and post-checkout return handling.
+  - `auth.html` — Hosted account creation, sign-in, recovery, and session adoption.
+  - `support.html` — Multi-channel customer support, billing help, and technical guidance.
+  - `privacy.html` — Data privacy draft and local-first data disclosures.
+  - `terms.html` — Commercial terms of service launch draft.
 
 ## Billing configuration required before checkout works
 Set these production environment variables in Netlify:
@@ -18,6 +28,7 @@ Set these production environment variables in Netlify:
 - `STRIPE_SECRET_KEY`
 - `STRIPE_PRICE_FAMILY`
 - `STRIPE_PRICE_TEACHER`
+- `STRIPE_WEBHOOK_SECRET`
 
 No prices are hard-coded in this package.
 
@@ -28,7 +39,7 @@ This package is not a claim of legal, security, COPPA/FERPA, accessibility, or p
 This is source code that requires a Netlify build so Functions and Database migrations are provisioned. A simple drag-and-drop static deploy will serve the HTML pages but will not activate the backend functions/database build pipeline.
 
 ## Hosted authentication gate
-This package now expects a hosted Supabase Auth project before commercial account endpoints are enabled.
+This package expects a hosted Supabase Auth project before commercial account endpoints are enabled.
 Set these Netlify production environment variables:
 - `SUPABASE_URL`
 - `SUPABASE_PUBLISHABLE_KEY` (preferred) or `SUPABASE_ANON_KEY`
@@ -43,13 +54,14 @@ Authentication routes:
 - `/commercial-api/auth/refresh`
 - `/commercial-api/auth/signout`
 - `/commercial-api/auth/recover`
+- `/commercial-api/auth/update-password`
+- `/commercial-api/auth/adopt-session`
 
-Security note: Family/parent and teacher are the only self-service commercial roles. School access is disabled. Commercial accounts are bound to the hosted provider's immutable auth user ID.
+Security note: Family/parent and teacher are the only self-service commercial roles. School access is disabled from self-service. Commercial accounts are bound to the hosted provider's immutable auth user ID.
 
+## Stripe webhook & Customer Portal activation
 
-## Stripe webhook activation
-
-The package now includes `/commercial-api/stripe-webhook`. Configure `STRIPE_WEBHOOK_SECRET` in Netlify after creating the Stripe webhook endpoint. The handler verifies the `Stripe-Signature` header against the raw request body, rejects stale signatures, records processed event IDs for idempotency, and synchronizes subscription state and entitlements.
+Configure `STRIPE_WEBHOOK_SECRET` in Netlify after creating the Stripe webhook endpoint. The handler verifies the `Stripe-Signature` header against the raw request body, rejects stale signatures, records processed event IDs for idempotency, and synchronizes subscription state and entitlements.
 
 Recommended subscribed events for this build:
 - `checkout.session.completed`
@@ -59,13 +71,12 @@ Recommended subscribed events for this build:
 - `invoice.paid`
 - `invoice.payment_failed`
 
-Checkout now copies LearnForge plan/user metadata onto the Stripe Subscription so subsequent subscription lifecycle events can map back to the authenticated LearnForge account.
-
+Checkout copies LearnForge plan/user metadata onto the Stripe Subscription so subsequent subscription lifecycle events map back to the authenticated LearnForge account. The `/commercial-api/portal` endpoint allows active subscribers to manage payment methods and cancellation directly through Stripe's hosted Billing Portal.
 
 ## Current Stripe test catalog
 
 - Family: $3 USD/month — `price_1UEz7K3ItjkrrGb20QhuWGdd`
 - Teacher: $5 USD/month — `price_1UEz7Q3ItjkrrGb2WzldHDJt`
-- School: disabled/inactive
+- School: disabled/inactive for self-service (enterprise contact only)
 - No annual subscription prices
 - Commercial function routes use `/commercial-api/...` to avoid collision with the LearnForge monolith's internal `/api/...` router.
