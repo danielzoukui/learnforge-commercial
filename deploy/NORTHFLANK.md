@@ -10,120 +10,172 @@ Sandbox ("limited compute"); directory listings report ~10 GB/month free egress 
 note that a payment card is required to create the account. Confirm both in the
 console (Project → Usage) before pointing real traffic at it.
 
+Everything in this repository has been verified end-to-end against **PostgreSQL 18.4**
+(migrations, purchase lifecycle, entitlement grants/revocations, webhook
+idempotency) — see [Verified before you start](#verified-before-you-start).
+
 ---
 
-## 1. Project and database
+## Fast path: deploy the template
 
-1. Create an account and a project (e.g. `learnforge-commercial`).
-2. **Add a PostgreSQL addon** with the smallest/free plan. Note the connection
-   details on the addon page:
-   - `POSTGRES_URI` — full connection string
-   - `HOST`, `PORT`, `DATABASE`, `USERNAME`, `PASSWORD`
-3. Enable the addon's **external access** if you want to run migrations from your
-   laptop (step 4). Internal-only access is fine if you migrate from a job/service
-   inside Northflank instead.
+`deploy/northflank.json` is Infrastructure-as-Code for exactly this stack:
+PostgreSQL 16 addon → combined service built from this repository's `Dockerfile`
+→ secret group with the addon's connection string linked in as `DATABASE_URL`.
 
-## 2. Service from this repository
+1. **Templates → Create template → … → Edit as code.** Paste the contents of
+   [`northflank.json`](northflank.json) and save.
+2. **Settings → Arguments:** fill `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`,
+   `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (use *argument overrides* — they are
+   stored outside version control). The two Stripe price ids already default to the
+   live Family/Teacher prices. Values and comments:
+   [`northflank-secrets.example.env`](northflank-secrets.example.env).
+3. **Run the template**, then watch the three nodes finish. The service builds the
+   Dockerfile and deploys on port 8080 with health check `/_runtime/health`.
+4. **Apply the migrations** (one of the two options below) — the app serves traffic
+   before this, but `/commercial-api/health` reports 503 until the schema exists.
+5. **Verify**, then finish the go-live steps.
 
-1. **Create service → Build from Git → `danielzoukui/learnforge-commercial`**,
-   branch `main` (or the branch you deploy from).
-2. Build type: **Dockerfile**, path `Dockerfile` (repository root).
-3. Networking: **public**, internal port **8080**, protocol HTTP.
-4. Health check: HTTP `GET /_runtime/health` (liveness only — it never touches the
-   database, so a paused database cannot restart-loop your container).
-5. Resources: start with the smallest Sandbox size available.
+> **Plan names:** the template uses `nf-compute-20` plans. If your team is on the
+> free Sandbox and the run rejects them, pick the sandbox-eligible plan in the UI
+> for the addon and the service — nothing else in the template changes.
+>
+> **Health check block:** if your template version rejects the `healthChecks` array,
+> delete those six lines and set the check in the service UI (`GET /_runtime/health`,
+> port 8080). The endpoint exists either way.
 
-## 3. Environment variables
+### Apply the migrations
 
-Create a runtime **secret group** and attach the addon's `POSTGRES_URI` to it
-(link it as `DATABASE_URL` if the console offers aliases, otherwise create
-`DATABASE_URL` with the value from the addon page). Add:
+**Option A — a Northflank job (no local tooling):** create a job in the same
+project using the same image, attach the `learnforge-secrets` secret group, set the
+command to `npm run migrate`, and run it once. Expected output:
 
-| Variable | Value |
-| --- | --- |
-| `DATABASE_URL` | `${POSTGRES_URI}` (or the literal connection string) |
-| `PUBLIC_SITE_URL` | `https://<your-domain>` |
-| `SUPABASE_URL` | `https://<project>.supabase.co` |
-| `SUPABASE_PUBLISHABLE_KEY` | anon / publishable key (`SUPABASE_ANON_KEY` also accepted) |
-| `STRIPE_SECRET_KEY` | `sk_live_...` or `sk_test_...` |
-| `STRIPE_WEBHOOK_SECRET` | `whsec_...` from the endpoint created in step 6 |
-| `STRIPE_PRICE_FAMILY` | `price_1UEz7K3ItjkrrGb20QhuWGdd` ($3/mo) |
-| `STRIPE_PRICE_TEACHER` | `price_1UEz7Q3ItjkrrGb2WzldHDJt` ($5/mo) |
-| `NODE_ENV` | `production` |
+```
+  ✓ 20260912140000_commercial_core/migration.sql — applied
+  ✓ 20260912143000_auth_identity/migration.sql — applied
+  ✓ 20260912150000_stripe_webhook/migration.sql — applied
+Schema is up to date.
+```
 
-Optional: `DATABASE_SSL=require` if the addon's TLS chain is not in the image CA
-store (the runtime infers this from `?sslmode=` in the URI when present),
-`HOST`/`PORT` only if you deviate from 8080.
+Re-run it any time: already-applied files report `already-applied`, so it is safe
+to run on every deploy.
 
-## 4. Apply the migrations
-
-From your laptop, using the addon's **external** connection string:
+**Option B — from your machine:** temporarily enable **external access** on the
+PostgreSQL addon, copy its `POSTGRES_URI`, then:
 
 ```bash
-export DATABASE_URL="postgres://user:pass@<external-host>:<port>/<database>"
-export DATABASE_SSL=require
-
+export DATABASE_URL="postgres://user:pass@<external-host>:<port>/learnforge?sslmode=require"
 npm install
-npm run migrate --status   # lists the 3 migrations as pending
-npm run migrate            # applies them in version order
+npm run migrate --status   # shows 3 pending migrations
+npm run migrate            # applies them
 ```
 
-Repeat `--status` afterwards: all three should report `already-applied`. The
-runner records each file in `commercial_schema_migrations`, so re-deploys never
-re-apply DDL, and editing an applied file is reported instead of silently skipped.
+Turn external access back off when you are done.
 
-*Alternative:* create a Northflank job that runs `npm run migrate` with the same
-secret group attached, if you prefer migrations to run inside the platform.
-
-## 5. Domain and TLS
-
-Add your custom domain to the service and create the DNS record Northflank shows.
-Certificates are issued automatically. Update `PUBLIC_SITE_URL` to the final HTTPS
-origin — it is used to build Stripe `success_url`/`cancel_url` and auth email
-redirects.
-
-## 6. Point Stripe at the new origin
-
-In the Stripe Dashboard → Developers → Webhooks, add:
-
-```
-https://<your-domain>/commercial-api/stripe-webhook
-```
-
-Events: `checkout.session.completed`, `customer.subscription.created`,
-`customer.subscription.updated`, `customer.subscription.deleted`,
-`invoice.paid`, `invoice.payment_failed`.
-
-Copy the signing secret into `STRIPE_WEBHOOK_SECRET` and redeploy. Then, in
-Supabase Auth → URL Configuration, add `https://<your-domain>/auth.html?verified=1`
-and your site URL to the allowed redirect list.
-
-## 7. Smoke tests
+### Verify
 
 ```bash
-curl -sS https://<your-domain>/_runtime/health          # {"ok":true,...,"routes":15}
-curl -sS https://<your-domain>/commercial-api/health    # {"ok":true,...,"database":"ready"}
-curl -sSI https://<your-domain>/ | head -5              # security headers, gzip
-curl -sS -o /dev/null -w '%{http_code}\n' https://<your-domain>/netlify/functions/commercial-health.mts   # 404
+npm run preflight -- --url https://<your-domain>
 ```
 
-Then complete one **test-mode** purchase: sign up, checkout, confirm
-`/commercial-api/entitlements` shows `learnforge.family`, open the billing portal,
-cancel, and confirm the webhook flips entitlements off. Check the service logs for
-`[config]` warnings — a clean boot prints none.
+`preflight` checks every required environment variable, database connectivity,
+migration state (pending/drifted), the presence of all five commercial tables, and
+the live HTTP surface — including that no `.zip`, `.mts` or `package.json` is
+publicly downloadable. Expected shape:
 
-## 8. Operating notes
+```
+Configuration
+  ✓ PUBLIC_SITE_URL is set — Stripe redirect + auth email base URL
+  ...
+Database
+  ✓ DATABASE_URL is set — postgres://user:***@host:5432/learnforge
+  ✓ Connection established — driver=postgres
+  ✓ All 3 migrations applied
+  ✓ No migration drift detected
+  ✓ All 5 commercial tables present
+Live host checks (https://your-domain)
+  ✓ GET /_runtime/health — {"ok":true,"service":"learnforge-commercial","runtime":"portable",...,"routes":15}
+  ✓ GET /commercial-api/health — {"ok":true,"service":"learnforge-commercial","database":"ready"}
+  ✓ GET / — 6xxxxxx bytes
+  ✓ /LearnForge_COMMERCIAL_MONETIZATION_COMPLETE_v17.2.zip is not served
+PREFLIGHT PASSED: configuration, database and schema are ready.
+```
 
-- **Boot log tells you what is missing.** The runtime prints any unset
-  `[config]` variables and whether the database is reachable.
+Manual equivalents:
+
+```bash
+curl -sS https://<your-domain>/commercial-api/health
+# {"ok":true,"service":"learnforge-commercial","database":"ready"}
+```
+
+A `503 {"ok":false,"database":"unavailable"}` here means the addon's connection
+string is not linked into `DATABASE_URL` (check the secret group) or the migrations
+from the step above have not run. The service logs print exactly which environment
+variables are missing and whether the database answered at boot.
+
+## Manual path (if you prefer clicking through the UI)
+
+1. **Project:** create `learnforge-commercial`.
+2. **Addon:** PostgreSQL 16, smallest plan, database name `learnforge`, TLS on,
+   external access off.
+3. **Service:** Build from Git → `danielzoukui/learnforge-commercial`, branch `main`
+   (or the branch you deploy from), build type **Dockerfile**, path `Dockerfile`.
+   Public HTTP on port **8080**, health check `GET /_runtime/health`.
+4. **Secret group:** add the variables from
+   [`northflank-secrets.example.env`](northflank-secrets.example.env), and link the
+   addon's `POSTGRES_URI` with the alias `DATABASE_URL`.
+5. Continue with *Apply the migrations* and *Verify* above.
+
+## Go-live steps
+
+1. **Domain:** add your custom domain to the service and create the DNS record
+   Northflank shows; TLS is automatic. Update `PUBLIC_SITE_URL` to the final HTTPS
+   origin — it builds the Stripe `success_url`/`cancel_url` and auth email redirects.
+2. **Stripe webhook:** Developers → Webhooks → add
+   `https://<your-domain>/commercial-api/stripe-webhook` with events
+   `checkout.session.completed`, `customer.subscription.created`,
+   `customer.subscription.updated`, `customer.subscription.deleted`,
+   `invoice.paid`, `invoice.payment_failed`. Copy the signing secret into
+   `STRIPE_WEBHOOK_SECRET` and redeploy.
+3. **Supabase:** Auth → URL Configuration → add `https://<your-domain>/auth.html?verified=1`
+   and your site URL to the allowed redirect list.
+4. **One test-mode purchase:** `STRIPE_SECRET_KEY=sk_test_...`, then sign up → choose
+   Family → pay with `4242 4242 4242 4242` → confirm `/commercial-api/entitlements`
+   returns `learnforge.family` → open the billing portal → cancel → confirm
+   entitlements disappear. Then switch to the live keys and redeploy.
+
+## Verified before you start
+
+These were executed against a real PostgreSQL server in this repository's build
+environment — `npm test` (62 checks) plus `npm run test:e2e` (13 checks):
+
+| Verified | Evidence |
+| --- | --- |
+| All 3 migrations apply to an empty database and are idempotent | `npm run migrate` twice on a fresh database |
+| `/commercial-api/health` returns `{"ok":true,...,"database":"ready"}` | real SQL `SELECT 1` through the portable driver |
+| Sign-up → account row bound to the immutable auth id | rows in `commercial_accounts`, audit event written |
+| Checkout sends the correct price, plan metadata, success/cancel URLs | asserted on the exact Stripe request parameters |
+| Signed webhook grants `learnforge.family` | HMAC-SHA256 signature over the real payload, subscription row `active` |
+| Replayed webhook is deduplicated | real `UNIQUE(provider, provider_event_id)` constraint |
+| Cancellation revokes entitlements | no enabled entitlement rows remain |
+| Checkout sync self-heals when Stripe returns an unexpanded subscription id | drift simulated, then recovered |
+| Billing portal opens from the persisted customer id | portal session created |
+
+Not verifiable without your accounts: the Docker image build on Northflank's
+builder, and a live Stripe/Supabase round trip. Both are steps 3–4 above.
+
+## Operating notes
+
+- **Boot log tells you what is missing.** The runtime prints unset `[config]`
+  variables and whether the database is reachable.
 - **Egress is the likely first limit** (~10 GB/month reported on Sandbox). The
-  runtime already gzips compressible responses; `index.html` is ~6.2 MB raw and
-  compresses substantially. If you approach the cap, put Cloudflare (free) in front
-  for static asset caching — see the payments caveat in
-  [`../HOSTING_OPTIONS.md`](../HOSTING_OPTIONS.md) first.
-- **Scaling:** Sandbox is capped at 2 services / 1 database. Beyond that, the same
+  runtime gzips compressible responses; `index.html` is ~6.2 MB raw. If you approach
+  the cap, put Cloudflare (free) in front for static asset caching — read the
+  payments caveat in [`../HOSTING_OPTIONS.md`](../HOSTING_OPTIONS.md) first.
+- **Scaling:** Sandbox is capped at 2 services / 1 database. Beyond that the same
   image moves to Northflank pay-as-you-go (~$0.0167/vCPU-hour, ~$0.0083/GB-hour)
-  with no code change, or to the Oracle runbook.
-- **Backups:** Sandbox backups are limited. Schedule `pg_dump` (a free cron job is
-  included) to object storage you control, and test a restore before taking live
+  with no code change, or to [`ORACLE_CLOUD_ALWAYS_FREE.md`](ORACLE_CLOUD_ALWAYS_FREE.md).
+- **Backups:** Sandbox backup coverage is limited. Schedule a `pg_dump` (a free cron
+  job is included) to storage you control, and test a restore before taking live
   payments.
+- **CI is already wired:** `.github/workflows/ci.yml` runs the typecheck, the full
+  suite, the exposure audit, and the PostgreSQL end-to-end purchase job on every push.

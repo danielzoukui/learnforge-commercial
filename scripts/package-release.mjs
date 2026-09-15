@@ -5,7 +5,7 @@ import { execSync } from "node:child_process";
 
 console.log("=== Packaging LearnForge Commercial Release ===");
 
-const zipName = "LearnForge_COMMERCIAL_MONETIZATION_COMPLETE_v17.1.zip";
+const zipName = "LearnForge_COMMERCIAL_MONETIZATION_COMPLETE_v17.2.zip";
 const zipPath = path.resolve(zipName);
 
 // Remove prior archive if present
@@ -14,7 +14,7 @@ if (fs.existsSync(zipPath)) {
 }
 
 // Files and folders to include in the release.
-// v17.1 adds the host-portable runtime, deployment runbooks and container build.
+// v17.2 adds the host-portable runtime, deployment runbooks and container build.
 const includes = [
   "index.html",
   "pricing.html",

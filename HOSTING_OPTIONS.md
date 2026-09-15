@@ -107,13 +107,23 @@ and portable**:
 | `runtime/migrate.mjs` | Applies the existing `netlify/database/migrations/*/migration.sql` files to any PostgreSQL, tracked and idempotent |
 | `Dockerfile` | Production image that copies **only** public assets + `netlify/` + `runtime/` |
 | `tests/test-portable-runtime.mjs` | 30 end-to-end checks: routing, cookies, Stripe HMAC, 503 fail-closed paths, migration idempotency, path-traversal and archive-exposure defences |
+| `tests/test-end-to-end-purchase.mjs` | 13 checks against a **real PostgreSQL**: migrate → sign-up → checkout → signed webhook → entitlements → replay → sync → portal → cancel |
+| `tests/test-netlify-exposure.mjs` + `scripts/check-netlify-exposure.mjs` | Proves the `publish = "."` exposure is closed on Netlify and that the portable runtime blocks the same paths |
+| `scripts/preflight-deploy.mjs` | Go-live preflight: env completeness, DB connectivity, migration state, live HTTP surface, and an exposure probe (`npm run preflight -- --url https://…`) |
+| `deploy/northflank.json` | Northflank Infrastructure-as-Code template: project + PostgreSQL addon + service + secret group |
 
-Verification (`npm test`): the original 19 Netlify assertions, the 5 Stripe
-signature assertions, and 30 new portable-runtime assertions all pass.
-**Not yet verified:** execution against a real PostgreSQL instance (no server was
-available in the build environment — the SQL path is exercised through a mock
-driver) and a live smoke test on Northflank/Oracle. Both are first steps in the
-runbooks.
+Verification (`npm test`): 62 assertions pass — 19 original Netlify, 5 Stripe
+signature, 7 Netlify-exposure, 30 portable-runtime — plus a 13-check end-to-end
+purchase suite (`npm run test:e2e`) executed against a **real PostgreSQL 18.4**
+server: migrations applied to an empty database, `/commercial-api/health`
+returning `{"ok":true,"database":"ready"}`, sign-up → account row, checkout request
+parameters, signed webhook granting `learnforge.family`, replay deduplication on
+the real unique constraint, checkout-sync self-healing, billing portal, and
+cancellation revoking entitlements. CI runs that suite against a PostgreSQL 16
+service container on every push (`.github/workflows/ci.yml`).
+
+**Still not verified:** the Docker image build (no daemon in the build environment)
+and a live Stripe/Supabase round trip. Both are covered by the runbooks.
 
 ---
 

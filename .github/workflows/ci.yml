@@ -32,3 +32,49 @@ jobs:
 
       - name: Run Commercial test suite
         run: npm test
+
+      - name: Audit Netlify publish-root exposure
+        run: npm run test:exposure
+
+  end-to-end:
+    name: End-to-End Purchase (real PostgreSQL)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: learnforge_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/learnforge_ci
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply commercial migrations to PostgreSQL
+        run: npm run migrate
+
+      - name: Verify migrations are idempotent
+        run: npm run migrate:status
+
+      - name: Run purchase lifecycle against PostgreSQL
+        run: npm run test:e2e

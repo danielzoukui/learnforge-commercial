@@ -24,7 +24,7 @@ const functionsDir = path.join(rootDir, "netlify", "functions");
 
 const PORT = Number.parseInt(process.env.PORT || "8080", 10);
 const HOST = process.env.HOST || "0.0.0.0";
-const VERSION = "17.0.0";
+const VERSION = "17.2.0";
 
 if (installEnvShim()) {
   console.log("[runtime] Netlify.env shim installed (read-only view of process.env)");

@@ -239,7 +239,7 @@ function sendJson(res, status, payload) {
 /**
  * @param {{ rootDir: string, functionsDir: string, version?: string }} options
  */
-export async function createApp({ rootDir, functionsDir, version = "17.0.0" }) {
+export async function createApp({ rootDir, functionsDir, version = "17.2.0" }) {
   const routes = await loadApiRoutes(functionsDir);
   const startedAt = Date.now();
 

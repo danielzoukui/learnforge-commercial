@@ -143,13 +143,15 @@ changes between targets.
 npm start                          # production server on 0.0.0.0:8080
 npm run migrate --status           # which of the 3 migrations are pending
 npm run migrate                    # apply them (idempotent, tracked)
+npm run test:e2e                   # full purchase lifecycle against a real PostgreSQL
+npm run preflight -- --url https://your-domain   # go-live readiness check
 ```
 
 | Document | Contents |
 | --- | --- |
 | [`HOSTING_OPTIONS.md`](HOSTING_OPTIONS.md) | Verified free-tier comparison (Sept 2026), corrections to earlier advice, and the recommended production path |
 | [`deploy/PORTABLE_RUNTIME.md`](deploy/PORTABLE_RUNTIME.md) | How the portability layer works, env-var mapping, parity notes, endpoint list |
-| [`deploy/NORTHFLANK.md`](deploy/NORTHFLANK.md) | Recommended: free, always-on service + PostgreSQL addon |
+| [`deploy/NORTHFLANK.md`](deploy/NORTHFLANK.md) | Recommended: free, always-on service + PostgreSQL addon (one-click [IaC template](deploy/northflank.json)) |
 | [`deploy/ORACLE_CLOUD_ALWAYS_FREE.md`](deploy/ORACLE_CLOUD_ALWAYS_FREE.md) | Maximum free headroom: ARM VM + Docker Compose + Caddy TLS |
 
 `npm run preview` remains a mock API server for UI work only; `npm start` is the

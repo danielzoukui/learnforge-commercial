@@ -86,13 +86,18 @@ archives, tests or CI configuration — and runs as the unprivileged `node` user
 ## Tests
 
 ```bash
-npm test     # 19 Netlify assertions + 5 Stripe signature checks + 30 portable-runtime checks
-npm run check  # TypeScript check of the shared handler sources
+npm test         # 62 assertions: Netlify, Stripe signatures, exposure audit, portable runtime
+npm run test:e2e # 13 checks against a real PostgreSQL (skips if DATABASE_URL is unset)
+npm run check    # TypeScript check of the shared handler sources
+npm run preflight -- --url https://your-domain   # go-live readiness check
 ```
 
 The portable suite boots the real server against a stub Supabase instance and
 verifies routing, session cookies, Stripe HMAC verification, fail-closed 503s,
-migration idempotency, path traversal and archive exposure.
+migration idempotency, path traversal and archive exposure. The end-to-end suite
+additionally drives a complete purchase against real PostgreSQL with a simulated
+Stripe API: migrations → sign-up → checkout → signed webhook → entitlements →
+replay deduplication → checkout sync → billing portal → cancellation.
 
 ## Static file policy
 

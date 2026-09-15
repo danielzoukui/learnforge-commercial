@@ -11,9 +11,12 @@
     "preview": "node scripts/preview-server.mjs",
     "migrate": "node runtime/migrate.mjs",
     "migrate:status": "node runtime/migrate.mjs --status",
+    "preflight": "node scripts/preflight-deploy.mjs",
     "package": "node scripts/package-release.mjs",
     "check": "tsc --noEmit --module esnext --moduleResolution bundler --target es2022 --types node --skipLibCheck netlify/functions/*.mts netlify/functions/_shared/*.ts",
-    "test": "node tests/test-commercial.mjs && node tests/test-webhook-signatures.mjs && node tests/test-portable-runtime.mjs"
+    "test": "node tests/test-commercial.mjs && node tests/test-webhook-signatures.mjs && node tests/test-netlify-exposure.mjs && node tests/test-portable-runtime.mjs && node tests/test-end-to-end-purchase.mjs",
+    "test:e2e": "node tests/test-end-to-end-purchase.mjs --require-database",
+    "test:exposure": "node scripts/check-netlify-exposure.mjs"
   },
   "dependencies": {
     "@netlify/database": "latest",
