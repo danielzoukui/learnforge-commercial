@@ -91,7 +91,8 @@ async function startMockProviders({ siteUrl }) {
     webhookEndpoints: [],
     createdPrices: [],
     products: [],
-    supabaseAuth: { site_url: null, uri_allow_list: "" },
+    supabaseAuth: { site_url: null, uri_allow_list: "", mailer_autoconfirm: true },
+    autoconfirm: true,
     webhookSecret: WEBHOOK_SECRET
   };
 
@@ -144,7 +145,7 @@ async function startMockProviders({ siteUrl }) {
     if (p === "/auth/v1/logout") return json(res, 204, {});
 
     // ---- Supabase Management API ------------------------------------------
-    if (p.endsWith("/config/auth") && req.method === "GET") return json(res, 200, state.supabaseAuth);
+    if (p.endsWith("/config/auth") && req.method === "GET") return json(res, 200, { ...state.supabaseAuth, mailer_autoconfirm: state.autoconfirm });
     if (p.endsWith("/config/auth") && req.method === "PATCH") {
       state.supabaseAuth = { ...state.supabaseAuth, ...body };
       return json(res, 200, state.supabaseAuth);
@@ -547,6 +548,41 @@ async function main() {
     assert.equal(livePriceCheck.code, 0, `mode reporting should not be a failure:\n${livePriceCheck.output}`);
     assert.match(livePriceCheck.output, /LIVE price/);
     ok("readiness checker reports the mode of each configured price");
+
+    // Email confirmation ON changes the rehearsal path: the checker must say so,
+    // because the automated sign-up would never get a session.
+    providers.state.autoconfirm = false;
+    const confirmationOn = await runBootstrap({
+      ...cleanEnv,
+      NORTHFLANK_API_TOKEN: "nfp_test_token",
+      NORTHFLANK_API_BASE: `${providers.url}/v1`,
+      STRIPE_API_BASE: `${providers.url}/v1`,
+      SUPABASE_API_BASE: `${providers.url}/v1`,
+      STRIPE_SECRET_KEY: "sk_test_mock",
+      STRIPE_PRICE_FAMILY: "price_test_family",
+      SUPABASE_ACCESS_TOKEN: "sbp_test_token",
+      SUPABASE_URL: "https://mockref.supabase.co"
+    });
+    assert.equal(confirmationOn.code, 0, `confirmation being on is a warning, not a failure:\n${confirmationOn.output}`);
+    assert.match(confirmationOn.output, /Email confirmation is ON/);
+    assert.match(confirmationOn.output, /Auto Confirm User/);
+    ok("readiness checker warns when email confirmation will block the rehearsal");
+
+    // And the purchase step fails fast with a runnable recovery command, rather
+    // than signing up and stalling.
+    const noCreds = await runGolive(["--phase=verify", "--quiet"], {
+      ...goliveEnv,
+      SITE_URL: appUrl,
+      SUPABASE_API_BASE: `${providers.url}/v1`,
+      TEST_PURCHASE_EMAIL: "",
+      TEST_PURCHASE_PASSWORD: ""
+    });
+    assert.match(noCreds.output, /confirms email addresses/);
+    assert.match(noCreds.output, /Authentication → Users → Add user/);
+    assert.match(noCreds.output, /--phase=verify --url \S+ --email you@example\.com --password/);
+    ok("purchase step prints the exact recovery command when confirmation blocks sign-up");
+
+    providers.state.autoconfirm = true;
 
     // 12. Secrets are never printed in clear text.
     assert.ok(!run.output.includes(WEBHOOK_SECRET), "the webhook secret must not appear in logs");

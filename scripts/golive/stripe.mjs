@@ -243,7 +243,8 @@ export class StripeClient {
         if (!userCookie) {
           throw new Error(
             "sign-up did not return a session (Supabase email confirmation is enabled). " +
-            "Confirm the account, then re-run with --email/--password to sign in."
+            "Create the account in Supabase → Authentication → Users → Add user with \"Auto Confirm User\" ticked, " +
+            "then re-run with --email/--password to sign in."
           );
         }
         this.log?.ok(`signed up as ${email}`);

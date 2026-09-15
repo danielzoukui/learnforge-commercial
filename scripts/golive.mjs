@@ -248,8 +248,26 @@ async function phaseVerify() {
   if (config.skipPurchase) {
     log.info("test purchase skipped (--skip-purchase)");
   } else if (!config.email || !config.password) {
+    // If the project confirms email addresses, sign-up cannot return a session — say
+    // so now rather than half-way through a purchase attempt.
+    let confirmationsOn = false;
+    try {
+      const supabaseRef = projectRefFromUrl(config.supabaseUrl);
+      if (supabaseRef && config.supabaseToken) {
+        const auth = await new SupabaseClient({ accessToken: config.supabaseToken, baseUrl: bases.supabase, dryRun, log }).getAuthConfig(supabaseRef);
+        confirmationsOn = auth?.mailer_autoconfirm === false || auth?.disable_signup === true;
+      }
+    } catch {
+      // The setting is a nicety, not a requirement: fall through to the generic advice.
+    }
     log.warn("test purchase needs --email and --password for an account on this deployment");
-    results.warnings.push("Run: npm run golive -- --phase=verify --url … --email … --password … --stripe-purchase");
+    if (confirmationsOn) {
+      log.warn("this Supabase project confirms email addresses, so the automated sign-up cannot get a session:");
+      log.warn(`create the account first — ${config.supabaseUrl} → Authentication → Users → Add user (tick "Auto Confirm User")`);
+      log.warn("then pass those credentials:");
+    }
+    log.warn(`  npm run golive -- --phase=verify --url ${config.siteUrl} --email you@example.com --password '…'`);
+    results.warnings.push("Run the recovery command above to complete the purchase step, or re-run with --email/--password.");
   } else if (!config.stripeKey || !config.stripePriceFamily) {
     log.warn("test purchase needs STRIPE_SECRET_KEY and STRIPE_PRICE_FAMILY");
   } else {

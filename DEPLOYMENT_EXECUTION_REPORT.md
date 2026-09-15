@@ -5,8 +5,8 @@
 
 **Executed:** 15 September 2026 · **Branch:** `arena/01a0a641-learnforge-commercial` · **Pull request:** [#2](https://github.com/danielzoukui/learnforge-commercial/pull/2) · **Head commit:** `89b0c8a`
 
-**Distribution artifact:** `LearnForge_COMMERCIAL_MONETIZATION_COMPLETE_v17.2.zip` — 67 files, 2,356,861 bytes,
-SHA-256 `77b211b54184fc1a29330b5f3b8f0ce9e70f9e9be2c6b36dfc99c90e638ce2e2`
+**Distribution artifact:** `LearnForge_COMMERCIAL_MONETIZATION_COMPLETE_v17.2.zip` — 67 files, 2,358,127 bytes,
+SHA-256 `fea7aba1318ca331f72bf6404db2a06e1cda54b309b7abf8e7188c7d773b83f0`
 (this report is intentionally *not* inside the archive, so the hash stays stable).
 
 ---
@@ -267,7 +267,7 @@ this does — the test-mode endpoint keeps working for future rehearsals.
 
 ### How the automation was verified here
 
-`npm run test:golive` — **15 checks, all passing** — runs `scripts/golive.mjs` against mock Northflank,
+`npm run test:golive` — **17 checks, all passing** — runs `scripts/golive.mjs` against mock Northflank,
 Stripe and Supabase APIs served locally at their documented paths, while the application, the database
 and the webhook signature verification are real:
 
@@ -283,8 +283,10 @@ and the webhook signature verification are real:
 ✓ provider secrets are redacted from all pipeline output
 ✓ live price + test key: creates a plan-tagged test price, repoints the deployment, purchase still passes
 ✓ live key is refused before any charge is attempted
+✓ readiness checker warns when email confirmation will block the rehearsal
+✓ purchase step prints the exact recovery command when confirmation blocks sign-up
 
-GO-LIVE PIPELINE SUITE PASSED (15 checks)
+GO-LIVE PIPELINE SUITE PASSED (17 checks)
 ```
 
 One thing worth knowing before your first run, from reading the application's own mapping
@@ -338,10 +340,10 @@ the mock, not the app.
 | `npm run preflight` | passes end-to-end including exposure probes |
 | Northflank IaC template + secrets template | JSON validated, all `${refs}`/`${args}` resolve; `RUN_MIGRATIONS_ON_BOOT=true` added |
 | Go-live automation (`scripts/golive.mjs`, readiness checker, 4 provider modules) | project → addon → secrets → service → build → Supabase → Stripe webhook → test purchase |
-| Go-live pipeline suite against mock provider APIs | **15/15 checks**, real app + real PostgreSQL + real HMAC |
+| Go-live pipeline suite against mock provider APIs | **17/17 checks**, real app + real PostgreSQL + real HMAC |
 | CI | new real-PostgreSQL job; both jobs green on PR #2 |
-| Full suite | **62 assertions + 13 end-to-end checks + 15 pipeline checks**, `npm run check` clean |
-| Release artifact | `…_v17.2.zip`, 67 files, sha256 `77b211b5…8ce2e2` — now ships `scripts/golive*.mjs` and the pipeline suite |
+| Full suite | **62 assertions + 13 end-to-end checks + 17 pipeline checks**, `npm run check` clean |
+| Release artifact | `…_v17.2.zip`, 67 files, sha256 `fea7aba1…3b83f0` — now ships `scripts/golive*.mjs` and the pipeline suite |
 
 **Known gaps, stated plainly:**
 

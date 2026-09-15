@@ -17,11 +17,10 @@ Account creation  →  credentials  →  readiness check  →  deploy  →  veri
 
 ## 0. Before anything: two facts that save an hour
 
-1. **The deployment builds the `main` branch**, and `main` does not yet contain the
-   container build or the deployment templates (they are in the open pull request).
-   Either **merge pull request #2** first, or add
-   `--branch arena/01a0a641-learnforge-commercial` to every `golive` command below.
-   The readiness check tells you which situation you are in.
+1. **The deployment builds the `main` branch**, which now carries the container build,
+   the IaC template and the automation (pull request #2 merged). If you deploy from a
+   different branch, pass `--branch <name>`; the readiness check confirms whether your
+   checkout contains the `Dockerfile` that the build needs.
 2. **Stripe keeps test and live data in separate universes.** The price ids shipped in
    this repository are *live* prices, so a test key cannot use them — Stripe answers
    `No such price`. The automation handles this by creating a matching test-mode price
@@ -62,10 +61,16 @@ export SUPABASE_ACCESS_TOKEN=sbp_...
 export SUPABASE_URL=https://<your-ref>.supabase.co
 ```
 
-3. In **Authentication → Providers → Email**, decide about *Confirm email*: the
-   automated rehearsal signs a fresh account up and needs the session immediately, so
-   either turn confirmation off for the rehearsal, or pre-create and confirm the
-   account and pass its credentials with `--email/--password`.
+3. **If *Confirm email* is ON** (Authentication → Providers → Email) — the automated
+   rehearsal cannot create its own account, because sign-up returns no session until
+   the address is confirmed. Pre-create the rehearsal account instead:
+
+   **Authentication → Users → Add user** → email + password → tick **Auto Confirm
+   User** → Create. Then pass those credentials when you run the purchase
+   (`--email` / `--password` below). The readiness check detects this setting and
+   reminds you; the purchase step prints the exact recovery command if you forget.
+
+   With confirmation OFF, the run creates its own account and you can skip this.
 
 ## 3. [yours] Stripe test key
 
@@ -113,6 +118,9 @@ Every ✗ comes with a `↳` line telling you exactly how to fix it. Exit codes:
 ```bash
 npm run golive -- --dry-run     # prints every request it would send; sends nothing
 npm run golive                  # does it for real (~6–12 min, mostly the build)
+
+# with email confirmation ON, add the pre-confirmed account:
+npm run golive -- --email you@example.com --password '…'
 ```
 
 What the real run does, in order: creates the project → PostgreSQL 16 addon (TLS on,
@@ -178,7 +186,8 @@ confirm the entitlement, then refund it in Stripe.
 | `/commercial-api/health` stays 503 | `DATABASE_URL` not linked, or migrations failed | The service log names the missing variable and whether the database answered |
 | `No such price` | a live price met a test key somewhere unexpected | Check `STRIPE_PRICE_FAMILY`; the run normally rewrites it for you |
 | Purchase hangs, entitlements stay empty | webhook not reaching the app | Stripe → Developers → Webhooks → your endpoint → check delivery attempts |
-| Signup returns `{status:"pending"}` / no session | Supabase *Confirm email* is on | Confirm the account, then re-run with `--email/--password` |
+| Signup returns no session / purchase stalls before paying | Supabase *Confirm email* is on | Supabase → Authentication → Users → **Add user** (tick *Auto Confirm User*), then re-run with `--email/--password` |
+| `npm run golive:check` warns *Email confirmation is ON* | expected on your project | Follow the `↳` line: create the auto-confirmed user before the purchase step |
 | `typeSpecificSettings` unknown field | Northflank API version difference | `curl -s https://api.northflank.com/v1/swagger-json \| grep -o 'typeSpecific[A-Za-z]*' \| sort -u` and report it |
 
 **Everything is idempotent.** After fixing anything, re-run the same command: existing
@@ -221,5 +230,5 @@ the automation into the Northflank secret group, which Northflank stores encrypt
 | [`deploy/northflank-secrets.example.env`](deploy/northflank-secrets.example.env) | Every environment variable, with comments |
 
 *Verified state of the automation when this handbook was written: full suite
-62 assertions + 13 end-to-end checks + 15 pipeline checks, all green in CI on the
+62 assertions + 13 end-to-end checks + 17 pipeline checks, all green in CI on the
 PostgreSQL job.*

@@ -224,6 +224,19 @@ async function checkSupabase() {
     const existing = String(auth?.uri_allow_list || "").split(",").map((value) => value.trim()).filter(Boolean);
     record("ok", "Auth configuration readable",
       existing.length ? `${existing.length} redirect URL(s) already allowed` : "no redirect URLs configured yet");
+
+    // Whether sign-up confirms the email decides how the rehearsal gets an account.
+    if (auth?.disable_signup === true) {
+      record("warn", "Sign-ups are disabled on this project", "",
+        "Supabase → Authentication → Providers → Email → re-enable sign-ups, or create the rehearsal account yourself and pass --email/--password.");
+    } else if (auth?.mailer_autoconfirm === false) {
+      record("warn", "Email confirmation is ON",
+        "the automated rehearsal cannot create its own account unattended",
+        "Supabase → Authentication → Users → Add user → tick \"Auto Confirm User\", then run the purchase with --email/--password. " +
+        "(Or temporarily turn off Authentication → Providers → Email → Confirm email.)");
+    } else if (auth?.mailer_autoconfirm === true) {
+      record("ok", "Email confirmation is OFF", "the rehearsal can create its own account");
+    }
   } catch (error) {
     record("warn", `Could not read the auth configuration (${error?.status || error?.message || error})`, "",
       "The token may be project-scoped without auth_config_write. The redirect step will report the same thing during the run.");
